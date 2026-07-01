@@ -1,0 +1,25 @@
+# =============================================================================
+# EquityMind — local orchestration
+# -----------------------------------------------------------------------------
+# `make up` builds (if needed) and serves the Streamlit dashboard on :8501.
+# =============================================================================
+
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: equitymind:latest
+    container_name: equitymind-dashboard
+    ports:
+      - "8501:8501"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      EQUITYMIND_CONFIG: config/config.yaml
+    volumes:
+      # Persist the on-disk price cache and generated reports across restarts.
+      - ./.equitymind_cache:/app/.equitymind_cache
+      - ./reports:/app/reports
+    restart: unless-stopped

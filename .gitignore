@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Caches & generated artifacts
+.cache/
+.equitymind_cache/
+reports/
+*.log
+.pytest_cache/
+
+*.tex
+*.pdf
+*.aux
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

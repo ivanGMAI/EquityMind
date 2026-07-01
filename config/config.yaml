@@ -1,0 +1,103 @@
+# =============================================================================
+# EquityMind — system configuration
+# =============================================================================
+# This file is the single source of truth for tickers, analytical windows and
+# runtime behaviour. It is loaded and validated by equitymind.config.Settings.
+# Environment variables (see .env.example) override selected fields at runtime.
+# =============================================================================
+
+# Assets tracked by default. `class` is a free-form label used only for grouping
+# in reports; it does not affect the maths. Crypto pairs use the yfinance
+# convention (e.g. BTC-USD).
+universe:
+  - ticker: AAPL
+    name: Apple Inc.
+    asset_class: equity
+  - ticker: MSFT
+    name: Microsoft Corporation
+    asset_class: equity
+  - ticker: NVDA
+    name: NVIDIA Corporation
+    asset_class: equity
+  - ticker: SPY
+    name: SPDR S&P 500 ETF
+    asset_class: index
+  - ticker: BTC-USD
+    name: Bitcoin
+    asset_class: crypto
+
+data:
+  # Historical window pulled from the data source.
+  period: "1y"          # period alias (e.g. 1mo, 6mo, 1y, 5y, max)
+  interval: "1d"        # bar size (1d, 1h, ...)
+  # Price vendor: yfinance (global), moex (Moscow Exchange, RUB, key-less ISS
+  # API), or csv (local <TICKER>.csv files in csv_dir).
+  source: "yfinance"
+  csv_dir: "data"       # used when source: csv
+  moex_market: "shares" # used when source: moex (e.g. shares, index)
+  currency: null        # optional override, e.g. "RUB"
+  include_fundamentals: false  # fetch P/E, EPS, sector... (yfinance only)
+  cache_enabled: true
+  cache_dir: ".equitymind_cache"
+  cache_ttl_minutes: 60 # re-fetch data older than this
+
+analytics:
+  return_periods_days: [1, 7, 30]   # look-back windows for return calc
+  volatility_window: 21             # rolling window (trading days) for vol
+  trading_days_per_year: 252        # annualisation factor
+  sma_windows: [20, 50]             # simple moving averages
+  ema_windows: [12, 26]             # exponential moving averages
+  rsi_window: 14
+  trend_neutral_band_pct: 1.0       # |price vs SMA| below this => neutral
+  risk_free_rate: 0.04              # annual, fraction (0.04 = 4%) for Sharpe/alpha
+  var_confidence: 0.95              # confidence level for VaR / CVaR
+  var_horizon_days: 1               # holding horizon (days) for VaR / CVaR
+
+risk:
+  # Weights (0-1) blended into the composite 0-100 risk score. They are
+  # renormalised at runtime so they need not sum to exactly 1.
+  weights:
+    volatility: 0.45
+    drawdown: 0.30
+    trend: 0.15
+    momentum: 0.10
+  # Annualised volatility (as a fraction, e.g. 0.60 = 60%) mapped to score 100.
+  volatility_ceiling: 0.80
+  # Max drawdown (fraction, e.g. 0.50 = 50%) mapped to score 100.
+  drawdown_ceiling: 0.60
+
+alerts:
+  # Fire a volatility-spike alert when the latest annualised rolling vol exceeds
+  # its trailing mean by this many standard deviations.
+  volatility_zscore_threshold: 2.0
+  volatility_lookback: 60
+
+benchmark:
+  # Reference instrument for beta / alpha / correlation (CAPM). Loaded
+  # automatically if not part of the analysed universe. Set enabled: false to
+  # skip benchmark-relative statistics.
+  enabled: true
+  ticker: SPY
+
+portfolio:
+  # Cross-asset analytics: correlation matrix and reference allocations
+  # (equal-weight, minimum-variance, maximum-Sharpe, risk-parity) plus a sampled
+  # efficient frontier. Requires >= 2 instruments with overlapping history.
+  enabled: true
+  frontier_points: 25
+
+ai:
+  # Provider is resolved at runtime: env override -> credentials present ->
+  # mock fallback. See equitymind.ai.providers.build_provider.
+  model: "claude-opus-4-8"
+  max_tokens: 1500
+  effort: "medium"          # low | medium | high | max (adaptive-thinking depth)
+  temperature_note: "sampling params are not sent; Opus 4.8 rejects them"
+
+reporting:
+  output_dir: "reports"
+  include_charts: true
+  # Extra export formats written alongside the markdown report. Also available
+  # ad-hoc via the CLI flags `equitymind run --pptx --xlsx`.
+  export_pptx: false      # PowerPoint deck (python-pptx)
+  export_xlsx: false      # Excel workbook with formulas & pivot (openpyxl)

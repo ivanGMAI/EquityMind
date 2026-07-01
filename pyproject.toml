@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "equitymind"
+version = "0.1.0"
+description = "AI Market Intelligence System — modular quantitative analytics with LLM-generated commentary."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "EquityMind" }]
+dependencies = [
+    "pandas>=2.1",
+    "numpy>=1.26",
+    "yfinance>=0.2.40",
+    "pydantic>=2.6",
+    "PyYAML>=6.0",
+    "anthropic>=0.40",
+    "matplotlib>=3.8",
+    "streamlit>=1.33",
+    "pyarrow>=15.0",
+    "python-pptx>=0.6.23",
+    "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.10"]
+
+# uv-native dev dependency group (PEP 735). Installed by `uv sync` by default.
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.10"]
+
+[project.scripts]
+equitymind = "equitymind.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+# E501 (line length) is enforced by the formatter, not the linter, to avoid
+# churn on long f-strings in the reporting/table code.
+ignore = ["E501", "B008"]
+
+[tool.mypy]
+# Match the CI/runtime interpreter so modern third-party stubs (numpy, using the
+# 3.12 `type` statement) parse; our own code targets 3.10 via `from __future__
+# import annotations`.
+python_version = "3.12"
+ignore_missing_imports = true      # yfinance / pptx / openpyxl / streamlit ship no stubs
+check_untyped_defs = true
+warn_redundant_casts = true
+files = ["src"]

@@ -1,0 +1,32 @@
+# Version control / CI
+.git
+.gitignore
+
+# Python caches & local virtualenv
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local secrets & generated artifacts
+.env
+.cache/
+.equitymind_cache/
+reports/
+*.log
+
+*.tex
+*.pdf
+*.aux
+*.out
+*.toc
+*.synctex.gz
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
