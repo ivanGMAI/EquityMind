@@ -1,9 +1,9 @@
 """Chart rendering with matplotlib.
 
 Uses the non-interactive ``Agg`` backend so charts render identically on a
-server, in a container, or inside Streamlit. Functions return
-:class:`matplotlib.figure.Figure` objects (for the dashboard) and a helper saves
-them to PNG (for markdown/PDF reports).
+server or in a container. Functions return :class:`matplotlib.figure.Figure`
+objects and a helper saves them to PNG for the markdown/PowerPoint report
+exports (the web UI draws its own interactive charts client-side).
 """
 
 from __future__ import annotations

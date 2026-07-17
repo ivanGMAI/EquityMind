@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#F4F7F4] text-gray-900;
+  }
+
+  h1 {
+    @apply text-4xl font-bold;
+  }
+
+  h2 {
+    @apply text-2xl font-bold;
+  }
+
+  h3 {
+    @apply text-xl font-semibold;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow;
+  }
+
+  .card-title {
+    @apply text-lg font-semibold text-gray-900 mb-2;
+  }
+
+  .card-text {
+    @apply text-gray-600 text-sm;
+  }
+
+  .btn {
+    @apply px-4 py-2 rounded-xl font-medium transition-colors;
+  }
+
+  .btn-primary {
+    @apply bg-sber-500 text-white hover:bg-sber-600;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300;
+  }
+
+  .metric-card {
+    @apply bg-white rounded-xl border border-l-4 border-l-sber-500 border-gray-200 p-6 shadow-sm;
+  }
+
+  .progress-bar {
+    @apply w-full bg-gray-200 rounded-full h-2 overflow-hidden;
+  }
+
+  /* Фирменный градиент Сбера: зелёный → бирюза */
+  .progress-fill {
+    @apply h-full transition-all duration-500 bg-gradient-to-r from-sber-500 to-teal-400;
+  }
+
+  /* Выравнивание цифр в таблицах и метриках */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+}

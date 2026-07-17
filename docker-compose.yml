@@ -1,18 +1,20 @@
 # =============================================================================
 # EquityMind — local orchestration
 # -----------------------------------------------------------------------------
-# `make up` builds (if needed) and serves the Streamlit dashboard on :8501.
+# `make up` builds (if needed) and serves:
+#   frontend -> http://localhost:3000  (React + nginx, proxies /api to `api`)
+#   api      -> http://localhost:8000  (FastAPI, docs at /docs)
 # =============================================================================
 
 services:
-  dashboard:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
     image: equitymind:latest
-    container_name: equitymind-dashboard
+    container_name: equitymind-api
     ports:
-      - "8501:8501"
+      - "8000:8000"
     env_file:
       - path: .env
         required: false
@@ -22,4 +24,16 @@ services:
       # Persist the on-disk price cache and generated reports across restarts.
       - ./.equitymind_cache:/app/.equitymind_cache
       - ./reports:/app/reports
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: equitymind-frontend:latest
+    container_name: equitymind-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
     restart: unless-stopped

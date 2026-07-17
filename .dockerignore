@@ -26,6 +26,10 @@ reports/
 *.toc
 *.synctex.gz
 
+# Frontend has its own image (frontend/Dockerfile); keep it out of the
+# Python image's build context — node_modules alone is hundreds of MB.
+frontend/
+
 # OS / editor
 .DS_Store
 .idea/

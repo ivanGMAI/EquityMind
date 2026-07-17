@@ -10,8 +10,8 @@ COMPOSE ?= docker compose
 IMAGE   ?= equitymind:latest
 
 .DEFAULT_GOAL := help
-.PHONY: help install sync run dashboard test lint format typecheck check clean \
-        build up down logs shell
+.PHONY: help install sync run api test lint format typecheck check clean \
+        build up down logs shell prod-up prod-down prod-logs
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -26,8 +26,8 @@ sync: install
 run: ## Run the CLI, e.g. `make run ARGS="run AAPL MSFT --no-ai"`
 	uv run equitymind $(ARGS)
 
-dashboard: ## Launch the Streamlit dashboard locally
-	uv run streamlit run app/streamlit_app.py
+api: ## Launch the FastAPI server locally (no Docker)
+	uv run uvicorn equitymind.api.server:app --reload --port 8000
 
 test: ## Run the test suite
 	uv run pytest
@@ -53,15 +53,27 @@ clean: ## Remove caches and generated artifacts
 build: ## Build the Docker image
 	$(COMPOSE) build
 
-up: ## Build (if needed) and serve the dashboard at http://localhost:8501
-	$(COMPOSE) up --build -d
-	@echo "EquityMind dashboard -> http://localhost:8501"
+up: ## Build (if needed) and serve frontend :3000, API :8000
+	$(COMPOSE) up --build -d --remove-orphans
+	@echo "EquityMind frontend -> http://localhost:3000"
+	@echo "EquityMind API      -> http://localhost:8000 (docs: /docs)"
 
 down: ## Stop and remove the containers
 	$(COMPOSE) down
 
+# ---- Production (see deploy/DEPLOY.md) ---------------------------------------
+prod-up: ## Prod: build & start on loopback (frontend :5180, api :8020)
+	$(COMPOSE) -f docker-compose.prod.yaml up -d --build
+	@echo "frontend -> 127.0.0.1:5180 | api -> 127.0.0.1:8020 (за хостовым nginx)"
+
+prod-down: ## Prod: stop and remove containers
+	$(COMPOSE) -f docker-compose.prod.yaml down
+
+prod-logs: ## Prod: tail container logs
+	$(COMPOSE) -f docker-compose.prod.yaml logs -f
+
 logs: ## Tail container logs
 	$(COMPOSE) logs -f
 
-shell: ## Open a shell inside the running container
-	$(COMPOSE) exec dashboard /bin/bash
+shell: ## Open a shell inside the running api container
+	$(COMPOSE) exec api /bin/bash

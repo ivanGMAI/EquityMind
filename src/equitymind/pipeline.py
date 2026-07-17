@@ -2,7 +2,7 @@
 
 :class:`IntelligencePipeline` is the single entry point that composes every
 layer — data loading, analytics, AI commentary, comparison, alerting and
-backtesting — into one :class:`AnalysisReport`. The CLI, the Streamlit app and
+backtesting — into one :class:`AnalysisReport`. The CLI, the REST API and
 tests all drive the system through this class, so the wiring lives in exactly
 one place.
 """
@@ -59,6 +59,9 @@ class AnalysisReport:
     portfolio: PortfolioReport | None = None
     alerts: list[Alert] = field(default_factory=list)
     failures: dict[str, str] = field(default_factory=dict)
+    #: Benchmark used for beta/alpha, kept for relative-performance charts.
+    benchmark_ticker: str | None = None
+    benchmark_close: pd.Series | None = None
 
     def metrics_list(self) -> list[AssetMetrics]:
         return [a.metrics for a in self.assets.values()]
@@ -208,6 +211,8 @@ class IntelligencePipeline:
             portfolio=portfolio,
             alerts=alerts,
             failures=fetch.failures,
+            benchmark_ticker=bench_ticker,
+            benchmark_close=bench_close,
         )
 
     # ------------------------------------------------------------------ helpers

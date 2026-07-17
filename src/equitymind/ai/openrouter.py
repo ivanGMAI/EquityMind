@@ -21,6 +21,16 @@ BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_MODEL = "anthropic/claude-sonnet-4.5"
 
 
+def resolve_base_url() -> str:
+    """OpenAI-compatible endpoint to talk to.
+
+    Defaults to OpenRouter; set ``EQUITYMIND_LLM_BASE_URL`` to point the same
+    client at any other OpenAI-compatible host (e.g. cloud.ru foundation
+    models: ``https://foundation-models.api.cloud.ru/v1``).
+    """
+    return (os.getenv("EQUITYMIND_LLM_BASE_URL") or BASE_URL).rstrip("/")
+
+
 class OpenRouterError(RuntimeError):
     """Raised when the OpenRouter API cannot produce a usable response."""
 
@@ -58,7 +68,7 @@ def chat_completion(
     responses are retried a couple of times before giving up.
     """
     request = urllib.request.Request(
-        f"{BASE_URL}/chat/completions",
+        f"{resolve_base_url()}/chat/completions",
         data=json.dumps(body).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {resolve_api_key(api_key)}",

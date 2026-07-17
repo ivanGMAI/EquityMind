@@ -10,8 +10,9 @@
 # ---- Stage 1: build the virtual environment from the lockfile ---------------
 FROM python:3.12-slim AS builder
 
-# Pin uv from its official distroless image (no network install needed).
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Install uv from PyPI: ghcr.io (its official image registry) is unreachable
+# from some networks, while PyPI is consistently available.
+RUN pip install --no-cache-dir uv
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -40,17 +41,18 @@ WORKDIR /app
 # Bring over the resolved virtualenv and the application code.
 COPY --from=builder --chown=equity:equity /app /app
 
-# Put the venv on PATH so `equitymind` / `streamlit` are directly callable.
+# Put the venv on PATH so `equitymind` / `uvicorn` are directly callable.
+# PYTHONPATH pins imports to /app/src: uv's cached project wheel can leave a
+# stale copy in site-packages, and the live source must always win over it.
 ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     EQUITYMIND_CONFIG=config/config.yaml
 
 USER equity
-EXPOSE 8501
+EXPOSE 8000
 
-# Default: serve the Streamlit dashboard. Override the command to use the CLI,
+# Default: serve the FastAPI backend. Override the command to use the CLI,
 # e.g. `docker run --rm equitymind equitymind run AAPL MSFT --no-ai`.
-CMD ["streamlit", "run", "app/streamlit_app.py", \
-     "--server.address=0.0.0.0", "--server.port=8501", \
-     "--server.headless=true"]
+CMD ["uvicorn", "equitymind.api.server:app", "--host", "0.0.0.0", "--port", "8000"]

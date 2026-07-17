@@ -98,6 +98,32 @@ def _parse_candles(payload: dict[str, Any]) -> pd.DataFrame:
     return frame.dropna(subset=["close"])
 
 
+_ISS_SECURITIES = (
+    "https://iss.moex.com/iss/engines/stock/markets/{market}/boards/{board}/securities.json"
+    "?iss.only=securities&securities.columns=SECID,SHORTNAME"
+)
+
+
+def list_securities(market: str = "shares", board: str = "TQBR") -> list[dict[str, str]]:
+    """List tradable instruments on a MOEX board as ``{ticker, name}`` dicts.
+
+    TQBR is the main T+ equities board (~250 liquid Russian shares).
+    """
+    url = _ISS_SECURITIES.format(market=market, board=board)
+    payload = _http_get_json(url)
+    block = payload.get("securities", {})
+    cols = [str(c).upper() for c in block.get("columns", [])]
+    try:
+        i_secid, i_name = cols.index("SECID"), cols.index("SHORTNAME")
+    except ValueError as exc:
+        raise DataSourceError(f"unexpected ISS securities columns: {cols}") from exc
+    return [
+        {"ticker": str(row[i_secid]), "name": str(row[i_name] or row[i_secid])}
+        for row in block.get("data", [])
+        if row[i_secid]
+    ]
+
+
 def _cursor_needs_more(payload: dict[str, Any]) -> tuple[int, int, int]:
     """Return (index, total, pagesize) from a ``candles.cursor`` block."""
     cur = payload.get("candles.cursor", {})
