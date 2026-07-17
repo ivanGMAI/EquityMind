@@ -7,6 +7,7 @@ from .providers import (
     AnthropicProvider,
     LLMProvider,
     MockProvider,
+    OpenRouterProvider,
     ProviderError,
     build_provider,
 )
@@ -17,6 +18,7 @@ __all__ = [
     "LLMProvider",
     "AnthropicProvider",
     "MockProvider",
+    "OpenRouterProvider",
     "ProviderError",
     "build_provider",
 ]

@@ -33,6 +33,9 @@ STRICT RULES — these are compliance requirements, not stylistic preferences:
    the sample window is short or a signal is ambiguous.
 5. Tone: objective, concise, professional. No hype, no emojis, no hedging \
    filler. Use the instrument's own figures to support each point.
+6. LANGUAGE: write the entire commentary in RUSSIAN. Use standard Russian \
+   financial terminology; tickers and established metric names (Sharpe, VaR, \
+   RSI) may stay in Latin script.
 
 You will be given the instrument's computed quantitative metrics as JSON. \
 Produce structured commentary in the required output format. The commentary is \
@@ -73,9 +76,9 @@ COMMENTARY_SCHEMA: dict[str, Any] = {
 }
 
 DISCLAIMER = (
-    "This commentary is automated, educational market analysis generated from "
-    "quantitative indicators. It is not investment advice, a recommendation, or "
-    "an offer to transact in any security."
+    "Комментарий сгенерирован автоматически на основе количественных индикаторов "
+    "и носит учебно-аналитический характер. Это не инвестиционная рекомендация, "
+    "не совет и не предложение совершать сделки с какими-либо инструментами."
 )
 
 
@@ -87,10 +90,11 @@ def build_user_prompt(payload: dict[str, Any]) -> str:
         f"Analyse {ticker} using ONLY the quantitative metrics below. Percentages "
         f"are already expressed in percent (e.g. 3.5 means 3.5%).\n\n"
         f"```json\n{metrics_json}\n```\n\n"
-        "Write the desk note in the required structured format. Ground every "
-        "statement in these figures, explain what is driving the trend, and "
-        "assess the risk honestly — reference the risk-adjusted ratios "
-        "(Sharpe/Sortino/Calmar), the tail-risk figures (VaR/CVaR) and, where "
-        "present, the benchmark beta and correlation, noting uncertainty. Then "
-        "list the key signals. Do not give investment advice or price targets."
+        "Write the desk note in the required structured format, in RUSSIAN. "
+        "Ground every statement in these figures, explain what is driving the "
+        "trend, and assess the risk honestly — reference the risk-adjusted "
+        "ratios (Sharpe/Sortino/Calmar), the tail-risk figures (VaR/CVaR) and, "
+        "where present, the benchmark beta and correlation, noting uncertainty. "
+        "Then list the key signals. Do not give investment advice or price "
+        "targets."
     )

@@ -34,7 +34,9 @@ portfolio, or price an option, then explain.
 Compliance (hard rules): do NOT give investment advice (no buy/sell/hold), do NOT \
 predict prices or imply targets. Describe and explain what the data shows, note \
 uncertainty, and be concise and well-structured. When you have enough information, \
-give a clear final answer grounded in the tool outputs."""
+give a clear final answer grounded in the tool outputs.
+
+Answer in the language of the user's question (in Russian for a Russian question)."""
 
 
 @dataclass(slots=True)

@@ -26,3 +26,7 @@ reports/
 .DS_Store
 .idea/
 .vscode/
+docs/glossary.md
+docs/intro-speech.md
+docs/terms.md
+docs/about-project.md

@@ -120,7 +120,19 @@ class MoexSource(DataSource):
 
     def fetch(self, ticker: str, *, period: str, interval: str) -> PriceHistory:
         ticker = ticker.strip().upper()
-        base = _ISS_BASE.format(market=self.market, ticker=ticker)
+        try:
+            return self._fetch_market(ticker, self.market, period=period, interval=interval)
+        except DataSourceError:
+            # Indices (IMOEX, RTSI, …) live on the "index" market; fall back so a
+            # shares-configured source can still resolve an index benchmark.
+            if self.market == "index":
+                raise
+            return self._fetch_market(ticker, "index", period=period, interval=interval)
+
+    def _fetch_market(
+        self, ticker: str, market: str, *, period: str, interval: str
+    ) -> PriceHistory:
+        base = _ISS_BASE.format(market=market, ticker=ticker)
         params = {
             "from": _period_to_from(period),
             "till": date.today().isoformat(),

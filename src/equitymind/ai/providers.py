@@ -1,11 +1,13 @@
 """LLM provider abstraction for the market analyst.
 
-Two providers implement a single interface so the analyst is agnostic to the
+Three providers implement a single interface so the analyst is agnostic to the
 backend:
 
 * :class:`AnthropicProvider` — calls Claude (default ``claude-opus-4-8``) with
   structured outputs so the response is guaranteed to match the commentary
   schema.
+* :class:`OpenRouterProvider` — same commentary through OpenRouter's
+  OpenAI-compatible API, for ``sk-or-...`` keys.
 * :class:`MockProvider` — a deterministic, offline, rule-based generator that
   produces professional-sounding (advice-free) commentary directly from the
   metrics. It lets the whole pipeline run with no API key, in tests, or when
@@ -22,6 +24,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from ..logging_config import get_logger
+from . import openrouter
 
 logger = get_logger(__name__)
 
@@ -145,6 +148,93 @@ class AnthropicProvider(LLMProvider):
 
 
 # ---------------------------------------------------------------------------
+# OpenRouter (OpenAI-compatible chat completions)
+# ---------------------------------------------------------------------------
+class OpenRouterProvider(LLMProvider):
+    """OpenRouter-backed provider for ``sk-or-...`` keys.
+
+    Requests schema-constrained JSON via ``response_format``; models that
+    reject or ignore it are handled by a single retry with the schema inlined
+    into the prompt plus lenient JSON extraction.
+    """
+
+    name = "openrouter"
+
+    def __init__(
+        self,
+        model: str | None = None,
+        *,
+        max_tokens: int = 2000,
+        api_key: str | None = None,
+    ) -> None:
+        self.model = openrouter.resolve_model(model)
+        self.max_tokens = max(max_tokens, 2000)
+        self._api_key = api_key
+
+    def generate_commentary(
+        self,
+        payload: dict[str, Any],
+        *,
+        system: str,
+        user: str,
+        schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "commentary", "strict": True, "schema": schema},
+            },
+        }
+        try:
+            data = openrouter.chat_completion(body, api_key=self._api_key)
+        except openrouter.OpenRouterError as exc:
+            if "400" not in str(exc):
+                raise ProviderError(f"OpenRouter request failed: {exc}") from exc
+            # The chosen model likely rejects response_format — inline the schema.
+            body.pop("response_format")
+            body["messages"][1]["content"] = (
+                f"{user}\n\nReturn ONLY a JSON object matching this schema, "
+                f"with no surrounding prose:\n{json.dumps(schema)}"
+            )
+            try:
+                data = openrouter.chat_completion(body, api_key=self._api_key)
+            except openrouter.OpenRouterError as exc2:
+                raise ProviderError(f"OpenRouter request failed: {exc2}") from exc2
+
+        text = openrouter.message_text(openrouter.first_message(data))
+        if not text.strip():
+            raise ProviderError("Empty response from model")
+        result = self._extract_json(text)
+        logger.info("Generated commentary for %s via %s", payload.get("ticker"), self.model)
+        return result
+
+    @staticmethod
+    def _extract_json(text: str) -> dict[str, Any]:
+        """Parse JSON, tolerating markdown fences and surrounding prose."""
+        candidate = text.strip()
+        if candidate.startswith("```"):
+            candidate = candidate.strip("`").strip()
+            if candidate.startswith("json"):
+                candidate = candidate[4:].strip()
+        try:
+            return dict(json.loads(candidate))
+        except json.JSONDecodeError:
+            start, end = candidate.find("{"), candidate.rfind("}")
+            if start != -1 and end > start:
+                try:
+                    return dict(json.loads(candidate[start : end + 1]))
+                except json.JSONDecodeError:
+                    pass
+            raise ProviderError(f"Model returned non-JSON output: {text[:200]!r}") from None
+
+
+# ---------------------------------------------------------------------------
 # Offline rule-based mock
 # ---------------------------------------------------------------------------
 class MockProvider(LLMProvider):
@@ -189,22 +279,22 @@ class MockProvider(LLMProvider):
         mdd = risk.get("max_drawdown_pct")
 
         summary = (
-            f"{name} ({ticker}) closed the window at "
-            f"{payload.get('currency', '')} {payload.get('last_price')}, "
-            f"a {self._fmt(cum)} move over {window.get('bars', 'the')} bars "
-            f"({window.get('start')} to {window.get('end')}). "
-            f"Shorter-horizon returns stand at {self._fmt(r1)} (1d), "
-            f"{self._fmt(r7)} (7d) and {self._fmt(r30)} (30d)."
+            f"{name} ({ticker}) завершил окно на отметке "
+            f"{payload.get('currency', '')} {payload.get('last_price')}: "
+            f"движение {self._fmt(cum)} за {window.get('bars', '—')} баров "
+            f"({window.get('start')} — {window.get('end')}). "
+            f"Доходности на коротких горизонтах: {self._fmt(r1)} (1д), "
+            f"{self._fmt(r7)} (7д) и {self._fmt(r30)} (30д)."
         )
 
         trend_explanation = (
-            f"The trend model classifies {ticker} as {classification}. "
+            f"Трендовая модель классифицирует {ticker} как {classification}. "
             + (trend.get("rationale") or "")
         ).strip()
         if trend.get("slow_ma_slope_pct") is not None:
             trend_explanation += (
-                f" The slow moving average is sloping {self._fmt(trend.get('slow_ma_slope_pct'))} "
-                "over its recent window."
+                f" Наклон медленной скользящей средней за последнее окно — "
+                f"{self._fmt(trend.get('slow_ma_slope_pct'))}."
             )
 
         sharpe = perf.get("sharpe")
@@ -213,50 +303,56 @@ class MockProvider(LLMProvider):
         conf = tail.get("confidence_pct", 95)
         horizon = tail.get("horizon_days", 1)
         risk_analysis = (
-            f"Annualised volatility is {self._fmt(ann_vol)} and the deepest "
-            f"peak-to-trough drawdown in the window was {self._fmt(mdd)}. "
-            f"On a risk-adjusted basis the Sharpe ratio is "
-            f"{self._num(sharpe)} and the Sortino ratio {self._num(perf.get('sortino'))}. "
-            f"Historical {conf:g}% {horizon}-day Value-at-Risk is {self._fmt(var_pct)} "
-            f"with expected shortfall (CVaR) of {self._fmt(cvar_pct)}. "
-            f"The composite risk score is {score}/100 ({band}). "
-            "These are backward-looking, sample-dependent estimates; a short or "
-            "unusually calm window can understate tail risk, and volatility "
-            "clusters, so recent readings may not persist."
+            f"Годовая волатильность — {self._fmt(ann_vol)}, самая глубокая просадка "
+            f"от пика до дна за окно — {self._fmt(mdd)}. "
+            f"С поправкой на риск: коэффициент Шарпа {self._num(sharpe)}, "
+            f"Сортино {self._num(perf.get('sortino'))}. "
+            f"Исторический {conf:g}% VaR на {horizon} дн. — {self._fmt(var_pct)}, "
+            f"ожидаемые потери в хвосте (CVaR) — {self._fmt(cvar_pct)}. "
+            f"Композитный риск-скор — {score}/100 ({band}). "
+            "Все оценки построены на прошлом и зависят от выборки: короткое или "
+            "аномально спокойное окно занижает хвостовой риск, а волатильность "
+            "кластеризуется, поэтому текущие значения могут не сохраниться."
         )
         if bench:
             risk_analysis += (
-                f" Relative to {bench.get('benchmark')}, beta is "
-                f"{self._num(bench.get('beta'))} and the correlation of daily "
-                f"returns is {self._num(bench.get('correlation'))}."
+                f" Относительно {bench.get('benchmark')}: бета "
+                f"{self._num(bench.get('beta'))}, корреляция дневных доходностей "
+                f"{self._num(bench.get('correlation'))}."
             )
 
         key_signals = []
         if classification != "undetermined":
-            key_signals.append(f"Trend regime: {classification}.")
+            key_signals.append(f"Трендовый режим: {classification}.")
         if ann_vol is not None:
-            key_signals.append(f"Annualised volatility {self._fmt(ann_vol)}.")
+            key_signals.append(f"Годовая волатильность {self._fmt(ann_vol)}.")
         rsi_key = next((k for k in indicators if k.startswith("rsi")), None)
         if rsi_key and indicators.get(rsi_key) is not None:
             rsi_val = indicators[rsi_key]
-            zone = "overbought" if rsi_val >= 70 else "oversold" if rsi_val <= 30 else "neutral"
-            key_signals.append(f"RSI at {rsi_val:.0f} ({zone}).")
+            zone = (
+                "перекупленность"
+                if rsi_val >= 70
+                else "перепроданность"
+                if rsi_val <= 30
+                else "нейтрально"
+            )
+            key_signals.append(f"RSI {rsi_val:.0f} ({zone}).")
         if score is not None:
-            key_signals.append(f"Composite risk {score}/100 ({band}).")
+            key_signals.append(f"Композитный риск {score}/100 ({band}).")
         if sharpe is not None:
-            key_signals.append(f"Sharpe ratio {self._num(sharpe)}.")
+            key_signals.append(f"Коэффициент Шарпа {self._num(sharpe)}.")
         if var_pct is not None:
-            key_signals.append(f"Historical {conf:g}% VaR {self._fmt(var_pct)}.")
+            key_signals.append(f"Исторический {conf:g}% VaR {self._fmt(var_pct)}.")
         if bench and bench.get("beta") is not None:
-            key_signals.append(f"Beta to {bench.get('benchmark')} {self._num(bench.get('beta'))}.")
+            key_signals.append(f"Бета к {bench.get('benchmark')} {self._num(bench.get('beta'))}.")
         if r30 is not None:
-            key_signals.append(f"30-day return {self._fmt(r30)}.")
+            key_signals.append(f"Доходность за 30 дней {self._fmt(r30)}.")
 
         return {
             "summary": summary,
-            "trend_explanation": trend_explanation or "Trend undetermined from the sample.",
+            "trend_explanation": trend_explanation or "Тренд по данной выборке не определён.",
             "risk_analysis": risk_analysis,
-            "key_signals": key_signals or ["Insufficient data for signal extraction."],
+            "key_signals": key_signals or ["Недостаточно данных для выделения сигналов."],
         }
 
     @staticmethod
@@ -286,9 +382,10 @@ def build_provider(
 
     Resolution order:
         1. Explicit ``prefer`` argument or ``EQUITYMIND_LLM_PROVIDER`` env var
-           (``"anthropic"`` / ``"mock"``).
+           (``"anthropic"`` / ``"openrouter"`` / ``"mock"``).
         2. ``AnthropicProvider`` if an ``ANTHROPIC_API_KEY`` is present.
-        3. ``MockProvider`` otherwise.
+        3. ``OpenRouterProvider`` if an ``OPENROUTER_API_KEY`` is present.
+        4. ``MockProvider`` otherwise.
     """
     choice = (prefer or os.getenv("EQUITYMIND_LLM_PROVIDER") or "").strip().lower()
 
@@ -298,13 +395,22 @@ def build_provider(
     if choice == "anthropic":
         logger.info("Using AnthropicProvider (forced): %s", model)
         return AnthropicProvider(model=model, max_tokens=max_tokens, effort=effort)
+    if choice == "openrouter":
+        provider = OpenRouterProvider(model=model, max_tokens=max_tokens)
+        logger.info("Using OpenRouterProvider (forced): %s", provider.model)
+        return provider
 
     if os.getenv("ANTHROPIC_API_KEY"):
         logger.info("Using AnthropicProvider: %s", model)
         return AnthropicProvider(model=model, max_tokens=max_tokens, effort=effort)
+    if os.getenv("OPENROUTER_API_KEY"):
+        provider = OpenRouterProvider(model=model, max_tokens=max_tokens)
+        logger.info("Using OpenRouterProvider: %s", provider.model)
+        return provider
 
     logger.warning(
-        "ANTHROPIC_API_KEY not set — falling back to offline MockProvider. "
-        "Set the key (or EQUITYMIND_LLM_PROVIDER=anthropic) for LLM commentary."
+        "Neither ANTHROPIC_API_KEY nor OPENROUTER_API_KEY is set — falling back "
+        "to the offline MockProvider. Set a key (or EQUITYMIND_LLM_PROVIDER) "
+        "for LLM commentary."
     )
     return MockProvider()
