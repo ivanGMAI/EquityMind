@@ -69,21 +69,22 @@ def test_provider_parses_fenced_json(monkeypatch):
     assert out == COMMENTARY
 
 
-def test_provider_retries_without_response_format_on_400(monkeypatch):
+def test_provider_inlines_schema_instead_of_response_format(monkeypatch):
+    """The schema is asked for in the prompt; ``response_format`` is never sent
+    (strict json_schema makes some reasoning models return empty messages)."""
     bodies: list[dict] = []
 
     def fake(body, **kw):
         bodies.append(copy.deepcopy(body))
-        if len(bodies) == 1:
-            raise openrouter.OpenRouterError("HTTP 400: response_format unsupported")
         return _response({"content": json.dumps(COMMENTARY)})
 
     monkeypatch.setattr(openrouter, "chat_completion", fake)
     out = OpenRouterProvider().generate_commentary({}, system="s", user="u", schema=SCHEMA)
     assert out == COMMENTARY
-    assert "response_format" in bodies[0]
-    assert "response_format" not in bodies[1]
-    assert "JSON object" in bodies[1]["messages"][1]["content"]
+    assert len(bodies) == 1
+    assert "response_format" not in bodies[0]
+    assert "JSON object" in bodies[0]["messages"][1]["content"]
+    assert json.dumps(SCHEMA) in bodies[0]["messages"][1]["content"]
 
 
 def test_provider_raises_on_non_json(monkeypatch):

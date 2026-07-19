@@ -35,12 +35,12 @@ if TYPE_CHECKING:  # avoid an import cycle; only needed for type hints
 logger = get_logger(__name__)
 
 # --- Brand palette (matches the web app: Sber green + teal) ------------------
-_BRAND = RGBColor(0x21, 0xA0, 0x38)       # Sber green — primary accent
+_BRAND = RGBColor(0x21, 0xA0, 0x38)  # Sber green — primary accent
 _BRAND_DARK = RGBColor(0x18, 0x7A, 0x2B)  # deeper green for the title band
-_INK = RGBColor(0x23, 0x2A, 0x30)         # near-black body text
-_MUTED = RGBColor(0x6B, 0x72, 0x80)       # grey captions
+_INK = RGBColor(0x23, 0x2A, 0x30)  # near-black body text
+_MUTED = RGBColor(0x6B, 0x72, 0x80)  # grey captions
 _WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-_ROW_ALT = RGBColor(0xEC, 0xF6, 0xEE)     # light green zebra stripe
+_ROW_ALT = RGBColor(0xEC, 0xF6, 0xEE)  # light green zebra stripe
 
 _SLIDE_W = Inches(13.333)
 _SLIDE_H = Inches(7.5)
@@ -119,23 +119,47 @@ class PowerPointGenerator:
         self._rect(slide, 0, 0, _SLIDE_W, Inches(2.4), _BRAND)
         self._rect(slide, 0, Inches(2.4), _SLIDE_W, Inches(0.08), _BRAND_DARK)
         self._add_text(
-            slide, "EquityMind", Inches(0.9), Inches(0.7), Inches(11.5), Inches(1.0),
-            size=46, bold=True, color=_WHITE,
+            slide,
+            "EquityMind",
+            Inches(0.9),
+            Inches(0.7),
+            Inches(11.5),
+            Inches(1.0),
+            size=46,
+            bold=True,
+            color=_WHITE,
         )
         self._add_text(
-            slide, "Аналитика финансовых рынков", Inches(0.9), Inches(1.6),
-            Inches(11.5), Inches(0.6), size=22, color=_WHITE,
+            slide,
+            "Аналитика финансовых рынков",
+            Inches(0.9),
+            Inches(1.6),
+            Inches(11.5),
+            Inches(0.6),
+            size=22,
+            color=_WHITE,
         )
         self._add_text(
-            slide, "Отчёт по количественному анализу — метрики, риск, портфель, деривативы",
-            Inches(0.9), Inches(3.1), Inches(11.5), Inches(0.6), size=18, color=_INK,
+            slide,
+            "Отчёт по количественному анализу — метрики, риск, портфель, деривативы",
+            Inches(0.9),
+            Inches(3.1),
+            Inches(11.5),
+            Inches(0.6),
+            size=18,
+            color=_INK,
         )
         self._add_text(
             slide,
             f"Сформировано {report.generated_at}   ·   "
             f"AI: {report.ai_provider} ({report.ai_model})   ·   "
             f"инструментов: {len(report.assets)}",
-            Inches(0.9), Inches(3.8), Inches(11.5), Inches(0.6), size=13, color=_MUTED,
+            Inches(0.9),
+            Inches(3.8),
+            Inches(11.5),
+            Inches(0.6),
+            size=13,
+            color=_MUTED,
         )
 
     def _ranking_slide(self, prs: PresentationObj, report: AnalysisReport) -> None:
@@ -167,7 +191,12 @@ class PowerPointGenerator:
             f"{len(p.tickers)} инструментов · {p.observations} наблюдений · "
             f"средняя корреляция {p.average_correlation:+.2f} · "
             f"безрисковая ставка {p.risk_free_rate * 100:.1f}%",
-            Inches(0.6), Inches(1.35), Inches(12), Inches(0.4), size=13, color=_MUTED,
+            Inches(0.6),
+            Inches(1.35),
+            Inches(12),
+            Inches(0.4),
+            size=13,
+            color=_MUTED,
         )
         headers = ["Портфель", "Ожид. доходность", "Волатильность", "Шарп"]
         rows = [
@@ -221,12 +250,25 @@ class PowerPointGenerator:
         commentary = analysis.commentary
         if commentary is not None:
             self._add_text(
-                slide, "Комментарий AI-аналитика", Inches(8.0), Inches(4.3), Inches(4.9),
-                Inches(0.4), size=13, bold=True, color=_BRAND,
+                slide,
+                "Комментарий AI-аналитика",
+                Inches(8.0),
+                Inches(4.3),
+                Inches(4.9),
+                Inches(0.4),
+                size=13,
+                bold=True,
+                color=_BRAND,
             )
             self._add_text(
-                slide, commentary.summary, Inches(8.0), Inches(4.7), Inches(4.9),
-                Inches(2.4), size=11, color=_INK,
+                slide,
+                commentary.summary,
+                Inches(8.0),
+                Inches(4.7),
+                Inches(4.9),
+                Inches(2.4),
+                size=11,
+                color=_INK,
             )
 
     def _disclaimer_slide(self, prs: PresentationObj) -> None:
@@ -235,7 +277,12 @@ class PowerPointGenerator:
             slide,
             f"{DISCLAIMER}\n\nПоказатели рассчитаны по историческим рыночным данным и "
             "описывают прошлое. Прошлые результаты не гарантируют будущей доходности.",
-            Inches(0.8), Inches(2.1), Inches(11.5), Inches(3.0), size=16, color=_INK,
+            Inches(0.8),
+            Inches(2.1),
+            Inches(11.5),
+            Inches(3.0),
+            size=16,
+            color=_INK,
         )
 
     # ------------------------------------------------------------------ helpers
@@ -244,8 +291,15 @@ class PowerPointGenerator:
         # Thin green brand bar at the very top + green title beneath it.
         self._rect(slide, 0, 0, _SLIDE_W, Inches(0.16), _BRAND)
         self._add_text(
-            slide, title, Inches(0.5), Inches(0.45), Inches(12.3), Inches(0.9),
-            size=28, bold=True, color=_BRAND_DARK,
+            slide,
+            title,
+            Inches(0.5),
+            Inches(0.45),
+            Inches(12.3),
+            Inches(0.9),
+            size=28,
+            bold=True,
+            color=_BRAND_DARK,
         )
         return slide
 

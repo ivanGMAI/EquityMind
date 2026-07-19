@@ -8,7 +8,7 @@ export function RankingTable({ comparison, onSelectAsset }) {
       <div className="px-6 py-4 border-b border-gray-200 dark:border-night-border">
         <h3 className="text-xl font-semibold">Рейтинг инструментов</h3>
         <p className="text-sm text-gray-500 dark:text-night-mut mt-1">
-          {comparison.length} актив(ов) · соотношение доходность/риск · нажми на строку для деталей
+          {comparison.length} актив(ов) · соотношение доходность/риск · нажми на строку — откроется подробный анализ ниже
         </p>
       </div>
 

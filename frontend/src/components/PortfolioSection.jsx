@@ -45,11 +45,13 @@ export function PortfolioSection({ portfolio, assets }) {
 
   const tickers = portfolio.tickers || []
 
-  // Бэкенд отдаёт обе ветви гиперболы; рисуем только эффективную (верхнюю):
-  // от вершины (минимальная волатильность) вверх, отсортированную по риску —
-  // иначе линия зигзагом скачет между ветвями.
+  // Бэкенд отдаёт обе ветви гиперболы. Эффективная (верхняя, от вершины с
+  // минимальной волатильностью) рисуется сплошной линией, неэффективная
+  // нижняя — пунктиром для контекста; вершина входит в обе, чтобы ветви
+  // соединялись. Сортировка по риску — иначе линия зигзагом скачет.
   const rawFrontier = portfolio.frontier || []
   let frontier = []
+  let lowerBranch = []
   if (rawFrontier.length) {
     const vertex = rawFrontier.reduce((a, b) =>
       b.volatility_pct < a.volatility_pct ? b : a
@@ -57,21 +59,36 @@ export function PortfolioSection({ portfolio, assets }) {
     frontier = rawFrontier
       .filter((p) => p.return_pct >= vertex.return_pct)
       .sort((a, b) => a.volatility_pct - b.volatility_pct)
+    lowerBranch = rawFrontier
+      .filter((p) => p.return_pct <= vertex.return_pct)
+      .sort((a, b) => a.volatility_pct - b.volatility_pct)
+    if (lowerBranch.length < 2) lowerBranch = []
   }
 
-  // Точки отдельных бумаг: годовая доходность × волатильность из метрик.
-  const assetPoints = Object.entries(assets || {})
-    .map(([ticker, a]) => {
-      const perf = a.metrics?.performance || {}
-      const vol = a.metrics?.volatility?.annualized_pct
-      if (perf.annualized_return_pct == null || vol == null) return null
-      return {
+  // Точки отдельных бумаг. Основной источник — portfolio.asset_points: те же
+  // средние доходности и ковариация (то же окно наблюдений), что у портфелей
+  // и границы, поэтому геометрия сходится — например, «равные веса» лежат на
+  // хорде между бумагами. Фолбэк на метрики актива (CAGR по собственному окну
+  // бумаги) — только для старых ответов API; он с границей не согласован.
+  const assetPoints = portfolio.asset_points
+    ? Object.entries(portfolio.asset_points).map(([ticker, a]) => ({
         name: ticker,
-        volatility_pct: vol,
-        return_pct: perf.annualized_return_pct,
-      }
-    })
-    .filter(Boolean)
+        volatility_pct: a.volatility_pct,
+        return_pct: a.expected_return_pct,
+        sharpe: a.sharpe,
+      }))
+    : Object.entries(assets || {})
+        .map(([ticker, a]) => {
+          const perf = a.metrics?.performance || {}
+          const vol = a.metrics?.volatility?.annualized_pct
+          if (perf.annualized_return_pct == null || vol == null) return null
+          return {
+            name: ticker,
+            volatility_pct: vol,
+            return_pct: perf.annualized_return_pct,
+          }
+        })
+        .filter(Boolean)
 
   const allocPoints = Object.entries(portfolio.allocations).map(([key, a]) => ({
     name: ALLOC_META[key]?.label || a.label,
@@ -99,8 +116,10 @@ export function PortfolioSection({ portfolio, assets }) {
         <div className="card">
           <h3 className="card-title">Эффективная граница Марковица</h3>
           <p className="card-text mb-4">
-            Каждая точка — портфель; кривая — лучшие возможные комбинации
-            «риск-доходность». Наведи курсор, чтобы увидеть цифры
+            Каждая точка — портфель; сплошная кривая — лучшие возможные комбинации
+            «риск-доходность», пунктир — неэффективная ветвь. Доходности бумаг и
+            портфелей — среднегодовые на общем окне наблюдений. Наведи курсор,
+            чтобы увидеть цифры
           </p>
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
@@ -145,6 +164,16 @@ export function PortfolioSection({ portfolio, assets }) {
                     <span className="text-sm text-gray-700 dark:text-night-sub">{value}</span>
                   )}
                 />
+                {lowerBranch.length > 0 && (
+                  <Scatter
+                    name="Неэффективная ветвь"
+                    data={lowerBranch}
+                    fill={t.refLine}
+                    line={{ stroke: t.refLine, strokeWidth: 1.5, strokeDasharray: '5 4' }}
+                    shape={() => null}
+                    legendType="none"
+                  />
+                )}
                 <Scatter
                   name="Эффективная граница"
                   data={frontier}

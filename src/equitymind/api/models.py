@@ -13,9 +13,13 @@ class AnalysisRequest(BaseModel):
     """Request to start a new analysis."""
 
     tickers: list[str] = Field(..., description="List of ticker symbols (e.g. ['SBER', 'GAZP'])")
-    period: str = Field(default="1y", description="Historical period: 1mo, 3mo, 6mo, 1y, 2y, 5y, max")
+    period: str = Field(
+        default="1y", description="Historical period: 1mo, 3mo, 6mo, 1y, 2y, 5y, max"
+    )
     interval: str = Field(default="1d", description="Bar interval: 1d, 1wk, 1mo")
-    return_basis: str = Field(default="cumulative", description="Ranking basis: cumulative, 30d, 7d, 1d")
+    return_basis: str = Field(
+        default="cumulative", description="Ranking basis: cumulative, 30d, 7d, 1d"
+    )
     with_ai: bool = Field(default=True, description="Include AI-generated commentary")
     with_backtest: bool = Field(default=True, description="Include trend backtest")
     source: str = Field(default="yfinance", description="Data source: moex, yfinance, csv")
@@ -87,8 +91,7 @@ class OptionsRequest(BaseModel):
     strategy: str = Field(
         default="long_call",
         description=(
-            "long_call | long_put | straddle | covered_call | "
-            "protective_put | bull_call_spread"
+            "long_call | long_put | straddle | covered_call | protective_put | bull_call_spread"
         ),
     )
     spot: float = Field(default=100.0, gt=0)

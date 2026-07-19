@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAnalysis } from '../hooks/useAnalysis'
 import { Sidebar } from './Sidebar'
 import { ProgressStream } from './ProgressStream'
@@ -42,8 +42,25 @@ export function Dashboard() {
   const [source, setSource] = useState(
     localStorage.getItem('equitymind_source') || 'moex'
   )
-  const [selectedAsset, setSelectedAsset] = useState(null)
+  // Какие плашки «Подробный анализ» развёрнуты: { SBER: true, LKOH: false }
+  const [openAssets, setOpenAssets] = useState({})
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const analysisRefs = useRef({})
+
+  const toggleAsset = (ticker) =>
+    setOpenAssets((prev) => ({ ...prev, [ticker]: !prev[ticker] }))
+
+  // Клик по строке рейтинга: развернуть анализ тикера и прокрутить к его плашке.
+  const handleSelectFromRanking = (ticker) => {
+    setOpenAssets((prev) => ({ ...prev, [ticker]: true }))
+    // Ждём рендер развёрнутого блока, затем скроллим к нему.
+    setTimeout(() => {
+      analysisRefs.current[ticker]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 100)
+  }
 
   // После анализа сразу открываем графики топового инструмента, чтобы они были
   // видны без дополнительного клика по строке рейтинга.
@@ -51,9 +68,19 @@ export function Dashboard() {
     if (!result?.assets) return
     const tickers = Object.keys(result.assets)
     if (!tickers.length) return
-    const top = result.comparison?.ranking?.[0]?.ticker
-    setSelectedAsset(top && result.assets[top] ? top : tickers[0])
+    const top = result.comparison?.[0]?.ticker
+    setOpenAssets({ [top && result.assets[top] ? top : tickers[0]]: true })
   }, [result])
+
+  // Плашки анализа идут в порядке рейтинга; активы вне рейтинга — в конце.
+  const orderedTickers = (() => {
+    if (!result?.assets) return []
+    const ranked = (result.comparison || [])
+      .map((e) => e.ticker)
+      .filter((t) => result.assets[t])
+    const rest = Object.keys(result.assets).filter((t) => !ranked.includes(t))
+    return [...ranked, ...rest]
+  })()
 
   const handleTickersChange = (newTickers) => {
     setTickers(newTickers)
@@ -73,7 +100,7 @@ export function Dashboard() {
   const handleAnalyze = async () => {
     if (tickers.length === 0) return
     setSidebarOpen(false)
-    setSelectedAsset(null)
+    setOpenAssets({})
     await submitAnalysis({
       tickers,
       period,
@@ -234,7 +261,7 @@ export function Dashboard() {
                 <div className="mb-8">
                   <RankingTable
                     comparison={result.comparison}
-                    onSelectAsset={setSelectedAsset}
+                    onSelectAsset={handleSelectFromRanking}
                   />
                 </div>
 
@@ -259,39 +286,38 @@ export function Dashboard() {
                   </div>
                 )}
 
-                {/* Подробный анализ: графики цены, просадки, метрики, AI-комментарий */}
-                {result.assets && Object.keys(result.assets).length > 0 && (
-                  <div className="mb-8">
-                    <button
-                      onClick={() =>
-                        setSelectedAsset(
-                          selectedAsset
-                            ? null
-                            : result.comparison?.ranking?.[0]?.ticker ||
-                                Object.keys(result.assets)[0]
-                        )
-                      }
-                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white dark:bg-night-card border border-gray-200 dark:border-night-border hover:bg-gray-50 dark:hover:bg-night-hover transition-colors font-semibold text-gray-800 dark:text-night-text"
-                    >
-                      <span>
-                        {selectedAsset
-                          ? `Подробный анализ — ${selectedAsset} (графики, метрики, AI)`
-                          : 'Развернуть подробный анализ (графики, метрики, AI)'}
-                      </span>
-                      <span className="text-gray-400 dark:text-night-mut">
-                        {selectedAsset ? '▲ Скрыть' : '▼ Показать'}
-                      </span>
-                    </button>
+                {/* Подробный анализ: своя плашка на каждый инструмент */}
+                {orderedTickers.length > 0 && (
+                  <div className="mb-8 space-y-4">
+                    {orderedTickers.map((ticker) => (
+                      <div
+                        key={ticker}
+                        ref={(el) => (analysisRefs.current[ticker] = el)}
+                        className="scroll-mt-4"
+                      >
+                        <button
+                          onClick={() => toggleAsset(ticker)}
+                          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white dark:bg-night-card border border-gray-200 dark:border-night-border hover:bg-gray-50 dark:hover:bg-night-hover transition-colors font-semibold text-gray-800 dark:text-night-text"
+                        >
+                          <span>
+                            Подробный анализ — {ticker} (графики, метрики, AI)
+                          </span>
+                          <span className="text-gray-400 dark:text-night-mut">
+                            {openAssets[ticker] ? '▲ Скрыть' : '▼ Показать'}
+                          </span>
+                        </button>
 
-                    {selectedAsset && result.assets[selectedAsset] && (
-                      <div className="mt-4">
-                        <AssetAnalysis
-                          ticker={selectedAsset}
-                          asset={result.assets[selectedAsset]}
-                          onClose={() => setSelectedAsset(null)}
-                        />
+                        {openAssets[ticker] && (
+                          <div className="mt-4">
+                            <AssetAnalysis
+                              ticker={ticker}
+                              asset={result.assets[ticker]}
+                              onClose={() => toggleAsset(ticker)}
+                            />
+                          </div>
+                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
                 )}
 

@@ -130,7 +130,62 @@ def test_analyze_portfolio_report(three_assets):
     assert "correlation" in payload and "allocations" in payload
 
 
+def test_asset_points_consistent_with_allocations(three_assets):
+    """Asset dots must live in the same (μ, σ) space as the frontier.
+
+    Regression for the dashboard chart where per-asset CAGR (own window) was
+    plotted against portfolio arithmetic means (overlap window): the
+    equal-weight portfolio visibly fell off the chord between its own assets.
+    """
+    rep = analyze_portfolio(three_assets, risk_free_rate=0.03)
+    assert rep is not None
+    assert set(rep.asset_points) == set(rep.tickers)
+
+    # Same units => the equal-weight return is the average of the asset returns.
+    avg_asset_ret = np.mean([p["expected_return_pct"] for p in rep.asset_points.values()])
+    assert rep.allocations["equal_weight"].expected_return_pct == pytest.approx(
+        avg_asset_ret, abs=0.02
+    )
+
+    # Volatility comes from the covariance diagonal over the same window.
+    rm = returns_matrix(three_assets)
+    expected_vols = np.sqrt(np.diag(covariance_matrix(rm).to_numpy())) * 100.0
+    for ticker, vol in zip(rep.tickers, expected_vols, strict=False):
+        assert rep.asset_points[ticker]["volatility_pct"] == pytest.approx(vol, abs=0.01)
+
+    assert "asset_points" in rep.to_payload()
+
+
 def test_analyze_portfolio_needs_two_assets():
     rng = np.random.default_rng(1)
     single = {"AAA": _history(rng.normal(0, 0.01, 100), "AAA")}
     assert analyze_portfolio(single) is None
+
+
+# ---- falling-market regime (all expected returns negative) ------------------
+# Regression for the SBER+LKOH drawdown case: the two-fund frontier sweep
+# degenerated into a stub and the closed-form tangency landed on the
+# inefficient branch (worse Sharpe than min-variance).
+_DRAWDOWN_MU = np.array([-0.25, -0.33])
+_DRAWDOWN_COV = np.array([[0.033, 0.011], [0.011, 0.075]])
+
+
+def test_frontier_spans_assets_when_returns_negative():
+    frontier = optimizer.efficient_frontier(_DRAWDOWN_MU, _DRAWDOWN_COV, n_points=25)
+    rets = [p["return"] for p in frontier]
+    vols = [p["volatility"] for p in frontier]
+    assert vols == sorted(vols)
+    # The curve reaches both single-asset corners exactly.
+    assert min(rets) == pytest.approx(-0.33, abs=1e-6)
+    assert max(rets) == pytest.approx(-0.25, abs=1e-6)
+    assert max(vols) == pytest.approx(float(np.sqrt(0.075)), abs=1e-6)
+
+
+def test_max_sharpe_not_worse_than_min_variance_in_drawdown():
+    rf = 0.04
+    ms = optimizer.max_sharpe_weights(_DRAWDOWN_MU, _DRAWDOWN_COV, risk_free_rate=rf)
+    mv = optimizer.min_variance_weights(_DRAWDOWN_COV)
+    s_ms = optimizer.portfolio_sharpe(ms, _DRAWDOWN_MU, _DRAWDOWN_COV, rf)
+    s_mv = optimizer.portfolio_sharpe(mv, _DRAWDOWN_MU, _DRAWDOWN_COV, rf)
+    assert s_ms is not None and s_mv is not None
+    assert s_ms >= s_mv - 1e-9

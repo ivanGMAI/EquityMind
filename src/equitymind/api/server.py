@@ -50,22 +50,54 @@ _CATALOG_TTL_SECONDS = 86400
 _YFINANCE_CATALOG: list[dict[str, str]] = [
     {"ticker": t, "name": n}
     for t, n in [
-        ("AAPL", "Apple"), ("MSFT", "Microsoft"), ("GOOGL", "Alphabet"),
-        ("AMZN", "Amazon"), ("NVDA", "NVIDIA"), ("META", "Meta Platforms"),
-        ("TSLA", "Tesla"), ("BRK-B", "Berkshire Hathaway"), ("JPM", "JPMorgan Chase"),
-        ("V", "Visa"), ("MA", "Mastercard"), ("JNJ", "Johnson & Johnson"),
-        ("WMT", "Walmart"), ("XOM", "Exxon Mobil"), ("CVX", "Chevron"),
-        ("PG", "Procter & Gamble"), ("KO", "Coca-Cola"), ("PEP", "PepsiCo"),
-        ("HD", "Home Depot"), ("BAC", "Bank of America"), ("GS", "Goldman Sachs"),
-        ("MS", "Morgan Stanley"), ("NFLX", "Netflix"), ("AMD", "AMD"),
-        ("INTC", "Intel"), ("CRM", "Salesforce"), ("ORCL", "Oracle"),
-        ("ADBE", "Adobe"), ("AVGO", "Broadcom"), ("QCOM", "Qualcomm"),
-        ("TXN", "Texas Instruments"), ("IBM", "IBM"), ("DIS", "Walt Disney"),
-        ("MCD", "McDonald's"), ("NKE", "Nike"), ("PFE", "Pfizer"),
-        ("ABBV", "AbbVie"), ("LLY", "Eli Lilly"), ("BA", "Boeing"),
-        ("CAT", "Caterpillar"), ("GE", "GE Aerospace"), ("UBER", "Uber"),
-        ("PYPL", "PayPal"), ("SPY", "S&P 500 ETF"), ("QQQ", "Nasdaq-100 ETF"),
-        ("GLD", "Gold ETF"), ("BTC-USD", "Bitcoin"), ("ETH-USD", "Ethereum"),
+        ("AAPL", "Apple"),
+        ("MSFT", "Microsoft"),
+        ("GOOGL", "Alphabet"),
+        ("AMZN", "Amazon"),
+        ("NVDA", "NVIDIA"),
+        ("META", "Meta Platforms"),
+        ("TSLA", "Tesla"),
+        ("BRK-B", "Berkshire Hathaway"),
+        ("JPM", "JPMorgan Chase"),
+        ("V", "Visa"),
+        ("MA", "Mastercard"),
+        ("JNJ", "Johnson & Johnson"),
+        ("WMT", "Walmart"),
+        ("XOM", "Exxon Mobil"),
+        ("CVX", "Chevron"),
+        ("PG", "Procter & Gamble"),
+        ("KO", "Coca-Cola"),
+        ("PEP", "PepsiCo"),
+        ("HD", "Home Depot"),
+        ("BAC", "Bank of America"),
+        ("GS", "Goldman Sachs"),
+        ("MS", "Morgan Stanley"),
+        ("NFLX", "Netflix"),
+        ("AMD", "AMD"),
+        ("INTC", "Intel"),
+        ("CRM", "Salesforce"),
+        ("ORCL", "Oracle"),
+        ("ADBE", "Adobe"),
+        ("AVGO", "Broadcom"),
+        ("QCOM", "Qualcomm"),
+        ("TXN", "Texas Instruments"),
+        ("IBM", "IBM"),
+        ("DIS", "Walt Disney"),
+        ("MCD", "McDonald's"),
+        ("NKE", "Nike"),
+        ("PFE", "Pfizer"),
+        ("ABBV", "AbbVie"),
+        ("LLY", "Eli Lilly"),
+        ("BA", "Boeing"),
+        ("CAT", "Caterpillar"),
+        ("GE", "GE Aerospace"),
+        ("UBER", "Uber"),
+        ("PYPL", "PayPal"),
+        ("SPY", "S&P 500 ETF"),
+        ("QQQ", "Nasdaq-100 ETF"),
+        ("GLD", "Gold ETF"),
+        ("BTC-USD", "Bitcoin"),
+        ("ETH-USD", "Ethereum"),
     ]
 ]
 
@@ -135,9 +167,7 @@ def create_app() -> FastAPI:
         settings.data.interval = interval
         loader = IntelligencePipeline._build_loader(settings)
         try:
-            history = await asyncio.to_thread(
-                loader.load, ticker, period=period, interval=interval
-            )
+            history = await asyncio.to_thread(loader.load, ticker, period=period, interval=interval)
         except Exception as exc:
             raise HTTPException(
                 status_code=502, detail=f"Не удалось загрузить {ticker}: {exc}"
@@ -306,7 +336,9 @@ def create_app() -> FastAPI:
             ],
             "summary": {
                 "net_cost": round(summary.net_cost, 4),
-                "max_profit": None if summary.max_profit_unbounded else round(summary.max_profit, 4),
+                "max_profit": None
+                if summary.max_profit_unbounded
+                else round(summary.max_profit, 4),
                 "max_loss": None if summary.max_loss_unbounded else round(summary.max_loss, 4),
                 "breakevens": [round(float(b), 4) for b in summary.breakevens],
             },
@@ -362,9 +394,7 @@ def create_app() -> FastAPI:
     async def list_jobs(status: str | None = Query(None)) -> dict[str, Any]:
         """List all jobs (optionally filter by status). Admin endpoint."""
         jobs_data = [
-            job.to_dict()
-            for job in _jobs.values()
-            if status is None or job.status.value == status
+            job.to_dict() for job in _jobs.values() if status is None or job.status.value == status
         ]
         return {
             "total": len(_jobs),
@@ -404,9 +434,7 @@ async def _run_analysis(job_id: str) -> None:
 
         # Run analysis (synchronous, blocking)
         job.progress = 0.1
-        job.current_step = (
-            "Считаю метрики и AI-комментарий…" if req.with_ai else "Считаю метрики…"
-        )
+        job.current_step = "Считаю метрики и AI-комментарий…" if req.with_ai else "Считаю метрики…"
 
         # pipeline.run() is synchronous; run it in a worker thread so the event
         # loop keeps serving /api/progress polls. The pipeline doesn't emit

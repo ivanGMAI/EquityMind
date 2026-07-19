@@ -8,8 +8,11 @@ risk-parity — each with its expected return, volatility and Sharpe ratio, plus
 sampled efficient frontier for context.
 
 Everything is annualised (arithmetic mean returns × trading days; annualised
-covariance) so the return/volatility figures are directly comparable to the
-per-asset metrics elsewhere in the system.
+covariance). The report also carries per-asset points (``asset_points``) taken
+from the *same* mean vector and covariance diagonal, so a consumer plotting
+assets next to the frontier gets internally consistent geometry — mixing in
+per-asset CAGR from another window would place the equal-weight portfolio off
+the chord between its own constituents.
 """
 
 from __future__ import annotations
@@ -54,6 +57,9 @@ class PortfolioReport:
     correlation: dict[str, dict[str, float]] = field(default_factory=dict)
     allocations: dict[str, PortfolioMetrics] = field(default_factory=dict)
     frontier: list[dict] = field(default_factory=list)
+    # Per-asset (return, volatility, Sharpe) in the same annualised units and
+    # over the same overlapping window as the allocations and the frontier.
+    asset_points: dict[str, dict] = field(default_factory=dict)
 
     def to_payload(self) -> dict:
         return {
@@ -63,6 +69,7 @@ class PortfolioReport:
             "average_correlation": round(self.average_correlation, 3),
             "correlation": self.correlation,
             "allocations": {k: v.to_dict() for k, v in self.allocations.items()},
+            "asset_points": self.asset_points,
         }
 
     def to_dict(self) -> dict:
@@ -144,6 +151,18 @@ def analyze_portfolio(
         mean_annual, cov_annual, n_points=frontier_points, risk_free_rate=risk_free_rate
     )
 
+    # Single-asset points in the same coordinates as the frontier: the mean
+    # vector and the covariance diagonal, not each asset's standalone CAGR.
+    vol_annual = np.sqrt(np.clip(np.diag(cov_annual), 0.0, None))
+    asset_points = {}
+    for ticker, mu_i, vol_i in zip(tickers, mean_annual, vol_annual, strict=False):
+        sharpe_i = None if vol_i == 0 else (float(mu_i) - risk_free_rate) / float(vol_i)
+        asset_points[ticker] = {
+            "expected_return_pct": round(float(mu_i) * 100.0, 2),
+            "volatility_pct": round(float(vol_i) * 100.0, 2),
+            "sharpe": None if sharpe_i is None else round(sharpe_i, 3),
+        }
+
     corr_dict = {
         row: {col: round(float(corr.loc[row, col]), 3) for col in tickers} for row in tickers
     }
@@ -156,4 +175,5 @@ def analyze_portfolio(
         correlation=corr_dict,
         allocations=allocations,
         frontier=frontier,
+        asset_points=asset_points,
     )

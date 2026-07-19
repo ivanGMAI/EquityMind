@@ -8,7 +8,8 @@ dependency-light and robust:
 * ``min_variance_weights`` — the global minimum-variance portfolio (closed form),
 * ``max_sharpe_weights`` — the tangency (maximum-Sharpe) portfolio (closed form),
 * ``risk_parity_weights`` — equal-risk-contribution weights (fixed-point iteration),
-* ``efficient_frontier`` — the frontier traced via two-fund separation.
+* ``efficient_frontier`` — the frontier sampled by sweeping target returns
+  (exact Lagrange solution per point).
 
 The covariance matrix is inverted with the Moore–Penrose pseudo-inverse so a
 near-singular matrix (highly correlated assets, short samples) degrades
@@ -61,16 +62,59 @@ def min_variance_weights(cov) -> np.ndarray:
     return _normalise(inv @ ones)
 
 
+def _target_return_weights(mean_returns, cov, target: float) -> np.ndarray | None:
+    """Minimum-variance weights for a given target return (Lagrange closed form).
+
+    Solves ``min wᵀΣw`` s.t. ``wᵀ1 = 1`` and ``wᵀμ = target``. Returns ``None``
+    when the system is degenerate (all expected returns equal, singular Σ).
+    """
+    mu = _as_array(mean_returns)
+    cov = np.asarray(cov, dtype=float)
+    ones = np.ones(len(mu))
+    inv = np.linalg.pinv(cov)
+    a = float(ones @ inv @ ones)
+    b = float(ones @ inv @ mu)
+    c = float(mu @ inv @ mu)
+    d = a * c - b * b
+    if not np.isfinite(d) or abs(d) < 1e-14:
+        return None
+    lam = (c - b * target) / d
+    gam = (a * target - b) / d
+    w = lam * (inv @ ones) + gam * (inv @ mu)
+    return w if np.all(np.isfinite(w)) else None
+
+
 def max_sharpe_weights(mean_returns, cov, risk_free_rate: float = 0.0) -> np.ndarray:
-    """Tangency (max-Sharpe) weights ``Σ⁻¹(μ − r_f)`` normalised to sum to 1."""
+    """Maximum-Sharpe weights, robust to falling markets.
+
+    The classic tangency formula ``Σ⁻¹(μ − r_f)`` maximises Sharpe only while
+    ``1ᵀΣ⁻¹(μ − r_f) > 0`` (the tangency lies on the efficient branch). When
+    every excess return is negative — a market-wide drawdown — that formula
+    lands on the *inefficient* branch and can return a portfolio with a worse
+    Sharpe than minimum variance. In that regime we instead scan the frontier
+    segment spanned by the assets' expected returns and pick the best Sharpe
+    found there (this bounds leverage; the unconstrained supremum is otherwise
+    reached only at infinite risk).
+    """
     mu = _as_array(mean_returns)
     cov = np.asarray(cov, dtype=float)
     excess = mu - risk_free_rate
     inv = np.linalg.pinv(cov)
     raw = inv @ excess
-    if raw.sum() == 0 or not np.isfinite(raw.sum()):
-        return min_variance_weights(cov)
-    return _normalise(raw)
+    total = raw.sum()
+    if np.isfinite(total) and total > 1e-12:
+        return _normalise(raw)
+
+    best_w = min_variance_weights(cov)
+    best_s = portfolio_sharpe(best_w, mu, cov, risk_free_rate)
+    for target in np.linspace(mu.min(), mu.max(), 200):
+        w = _target_return_weights(mu, cov, target)
+        if w is None:
+            break
+        s = portfolio_sharpe(w, mu, cov, risk_free_rate)
+        if s is not None and (best_s is None or s > best_s):
+            best_w, best_s = w, s
+    return best_w
 
 
 def risk_parity_weights(cov, *, iters: int = 500, tol: float = 1e-8) -> np.ndarray:
@@ -111,26 +155,31 @@ def risk_contributions(weights, cov) -> np.ndarray:
 def efficient_frontier(
     mean_returns, cov, *, n_points: int = 25, risk_free_rate: float = 0.0
 ) -> list[dict]:
-    """Sample the efficient frontier via two-fund separation.
+    """Sample the minimum-variance frontier by sweeping target returns.
 
-    Every frontier portfolio is a linear combination of the minimum-variance and
-    tangency portfolios; sweeping the mixing coefficient traces the curve without
-    any iterative optimiser. Returns ``[{"return", "volatility"}, ...]`` sorted by
-    volatility.
+    Each point is the exact Lagrange solution of ``min wᵀΣw`` at a target
+    return; targets span the assets' expected returns, so the curve always
+    stretches from the worst to the best asset regardless of the sign of the
+    returns (a two-fund sweep between min-variance and tangency degenerates to
+    a stub when those portfolios nearly coincide, e.g. in a drawdown). Returns
+    ``[{"return", "volatility"}, ...]`` sorted by volatility; both hyperbola
+    branches are included — the consumer draws the efficient one.
     """
     mu = _as_array(mean_returns)
     cov = np.asarray(cov, dtype=float)
-    w_mv = min_variance_weights(cov)
-    w_tan = max_sharpe_weights(mu, cov, risk_free_rate)
 
     points: list[dict] = []
-    for alpha in np.linspace(-0.5, 1.5, n_points):
-        w = _normalise(alpha * w_tan + (1.0 - alpha) * w_mv)
+    for target in np.linspace(mu.min(), mu.max(), n_points):
+        w = _target_return_weights(mu, cov, target)
+        if w is None:  # degenerate inputs: single point (min variance)
+            w = min_variance_weights(cov)
         points.append(
             {
                 "return": round(portfolio_return(w, mu), 6),
                 "volatility": round(portfolio_volatility(w, cov), 6),
             }
         )
+        if len(points) > 1 and points[-1] == points[-2]:
+            points.pop()
     points.sort(key=lambda p: p["volatility"])
     return points

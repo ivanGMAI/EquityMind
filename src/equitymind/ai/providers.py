@@ -153,9 +153,9 @@ class AnthropicProvider(LLMProvider):
 class OpenRouterProvider(LLMProvider):
     """OpenRouter-backed provider for ``sk-or-...`` keys.
 
-    Requests schema-constrained JSON via ``response_format``; models that
-    reject or ignore it are handled by a single retry with the schema inlined
-    into the prompt plus lenient JSON extraction.
+    Asks for schema-shaped JSON in the prompt itself (never via
+    ``response_format`` — strict json_schema makes some reasoning models return
+    empty messages) and extracts the JSON leniently from the reply.
     """
 
     name = "openrouter"
