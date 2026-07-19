@@ -10,6 +10,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import client from '../api/client'
+import { useChartTheme, TOOLTIP_CLASS } from '../theme'
 
 const STRATEGIES = [
   { value: 'long_call', label: 'Купить колл (Long call)' },
@@ -30,14 +31,14 @@ const GREEK_INFO = [
 function Num({ label, value, onChange, step = 1, disabled = false }) {
   return (
     <label className="block">
-      <span className="block text-xs font-semibold text-gray-700 mb-1">{label}</span>
+      <span className="block text-xs font-semibold text-gray-700 dark:text-night-sub mb-1">{label}</span>
       <input
         type="number"
         value={value}
         step={step}
         disabled={disabled}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm num focus:outline-none focus:ring-2 focus:ring-sber-500 disabled:opacity-40"
+        className="w-full px-2 py-1.5 num input-base rounded-lg disabled:opacity-40"
       />
     </label>
   )
@@ -47,9 +48,11 @@ function PayoffTooltip({ active, payload }) {
   if (!active || !payload || !payload.length) return null
   const p = payload[0].payload
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-md px-4 py-2 text-sm num">
-      <p className="text-gray-700">Цена на экспирации: <strong>{p.spot.toFixed(2)}</strong></p>
-      <p className={p.pnl >= 0 ? 'text-sber-600' : 'text-red-600'}>
+    <div className={TOOLTIP_CLASS + ' num'}>
+      <p className="text-gray-700 dark:text-night-sub">
+        Цена на экспирации: <strong>{p.spot.toFixed(2)}</strong>
+      </p>
+      <p className={p.pnl >= 0 ? 'text-sber-600 dark:text-sber-400' : 'text-red-600 dark:text-red-400'}>
         P&L: <strong>{p.pnl >= 0 ? '+' : ''}{p.pnl.toFixed(2)}</strong>
       </p>
     </div>
@@ -57,6 +60,7 @@ function PayoffTooltip({ active, payload }) {
 }
 
 export function OptionsLab() {
+  const t = useChartTheme()
   const [params, setParams] = useState({
     strategy: 'long_call',
     spot: 100,
@@ -117,11 +121,11 @@ export function OptionsLab() {
       {/* Параметры */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
         <label className="block col-span-2">
-          <span className="block text-xs font-semibold text-gray-700 mb-1">Стратегия</span>
+          <span className="block text-xs font-semibold text-gray-700 dark:text-night-sub mb-1">Стратегия</span>
           <select
             value={params.strategy}
             onChange={(e) => set('strategy')(e.target.value)}
-            className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sber-500"
+            className="w-full px-2 py-1.5 input-base rounded-lg"
           >
             {STRATEGIES.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
@@ -137,31 +141,31 @@ export function OptionsLab() {
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 mb-4">{error}</p>
+        <p className="text-sm text-red-600 dark:text-red-400 mb-4">{error}</p>
       )}
 
       {data && (
         <>
           {/* Сводка */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-500">Дебет / кредит</p>
+            <div className="bg-gray-50 dark:bg-night-hover rounded-xl p-3">
+              <p className="text-xs text-gray-500 dark:text-night-mut">Дебет / кредит</p>
               <p className="text-lg font-bold num">{summary.net_cost >= 0 ? '+' : ''}{summary.net_cost.toFixed(2)}</p>
             </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-500">Макс. прибыль</p>
-              <p className="text-lg font-bold text-sber-600 num">
+            <div className="bg-gray-50 dark:bg-night-hover rounded-xl p-3">
+              <p className="text-xs text-gray-500 dark:text-night-mut">Макс. прибыль</p>
+              <p className="text-lg font-bold text-sber-600 dark:text-sber-400 num">
                 {summary.max_profit == null ? '∞' : `+${summary.max_profit.toFixed(2)}`}
               </p>
             </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-500">Макс. убыток</p>
-              <p className="text-lg font-bold text-red-600 num">
+            <div className="bg-gray-50 dark:bg-night-hover rounded-xl p-3">
+              <p className="text-xs text-gray-500 dark:text-night-mut">Макс. убыток</p>
+              <p className="text-lg font-bold text-red-600 dark:text-red-400 num">
                 {summary.max_loss == null ? '−∞' : summary.max_loss.toFixed(2)}
               </p>
             </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-500">Безубыток</p>
+            <div className="bg-gray-50 dark:bg-night-hover rounded-xl p-3">
+              <p className="text-xs text-gray-500 dark:text-night-mut">Безубыток</p>
               <p className="text-lg font-bold num">
                 {summary.breakevens.length ? summary.breakevens.map((b) => b.toFixed(1)).join(', ') : '—'}
               </p>
@@ -179,28 +183,29 @@ export function OptionsLab() {
                       <stop offset={gradientOffset} stopColor="#E64646" stopOpacity={0.25} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" vertical={false} />
+                  <CartesianGrid stroke={t.grid} strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="spot"
                     type="number"
                     domain={['dataMin', 'dataMax']}
-                    tick={{ fontSize: 12, fill: '#6B7280' }}
+                    tick={{ fontSize: 12, fill: t.tick }}
                     tickLine={false}
+                    axisLine={{ stroke: t.axisLine }}
                     tickFormatter={(v) => v.toFixed(0)}
                   />
                   <YAxis
-                    tick={{ fontSize: 12, fill: '#6B7280' }}
+                    tick={{ fontSize: 12, fill: t.tick }}
                     tickLine={false}
                     axisLine={false}
                     width={48}
                   />
-                  <Tooltip content={<PayoffTooltip />} cursor={{ stroke: '#9CA3AF', strokeDasharray: '4 4' }} />
-                  <ReferenceLine y={0} stroke="#6B7280" strokeWidth={1} />
+                  <Tooltip content={<PayoffTooltip />} cursor={{ stroke: t.cursor, strokeDasharray: '4 4' }} />
+                  <ReferenceLine y={0} stroke={t.cursor} strokeWidth={1} />
                   <ReferenceLine
                     x={params.spot}
-                    stroke="#334155"
+                    stroke={t.ink}
                     strokeDasharray="4 4"
-                    label={{ value: 'спот', fontSize: 11, fill: '#334155', position: 'top' }}
+                    label={{ value: 'спот', fontSize: 11, fill: t.ink, position: 'top' }}
                   />
                   {summary.breakevens.map((b) => (
                     <ReferenceLine key={b} x={b} stroke="#D97706" strokeDasharray="3 3" />
@@ -219,14 +224,14 @@ export function OptionsLab() {
 
             {/* Греки */}
             <div>
-              <p className="text-sm font-semibold text-gray-900 mb-2">Суммарные греки</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-night-text mb-2">Суммарные греки</p>
               <table className="w-full text-sm">
                 <tbody>
                   {GREEK_INFO.map((g) => (
-                    <tr key={g.key} className="border-b border-gray-100">
+                    <tr key={g.key} className="border-b border-gray-100 dark:border-night-border">
                       <td className="py-1.5">
-                        <span className="text-gray-900">{g.label}</span>
-                        <span className="block text-[10px] text-gray-400">{g.hint}</span>
+                        <span className="text-gray-900 dark:text-night-text">{g.label}</span>
+                        <span className="block text-[10px] text-gray-400 dark:text-night-mut">{g.hint}</span>
                       </td>
                       <td className="py-1.5 text-right font-semibold num">
                         {data.greeks[g.key].toFixed(4)}
@@ -235,7 +240,7 @@ export function OptionsLab() {
                   ))}
                 </tbody>
               </table>
-              <p className="text-xs text-gray-400 mt-3">
+              <p className="text-xs text-gray-400 dark:text-night-mut mt-3">
                 Ноги стратегии: {data.legs.map((l) => `${l.quantity > 0 ? '+' : ''}${l.quantity} ${l.kind}${l.strike ? ' @' + l.strike : ''}`).join(', ')}
               </p>
             </div>

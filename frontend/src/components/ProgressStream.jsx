@@ -10,16 +10,16 @@ export function ProgressStream({ progress }) {
   ]
 
   return (
-    <div className="bg-gradient-to-r from-sber-50 to-teal-50 rounded-xl p-8 mb-8 border border-sber-200">
+    <div className="bg-gradient-to-r from-sber-50 to-teal-50 dark:from-[#14351F] dark:to-[#0E2A1D] rounded-xl p-8 mb-8 border border-sber-200 dark:border-sber-900">
       <h3 className="text-lg font-semibold mb-6">Анализирую…</h3>
 
       {/* Прогресс-бар */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-3">
-          <span className="text-sm font-medium text-gray-700">
+          <span className="text-sm font-medium text-gray-700 dark:text-night-sub">
             {progress.current_step}
           </span>
-          <span className="text-sm font-semibold text-sber-600 num">{percent}%</span>
+          <span className="text-sm font-semibold text-sber-600 dark:text-sber-400 num">{percent}%</span>
         </div>
         <div className="progress-bar">
           <div
@@ -39,19 +39,19 @@ export function ProgressStream({ progress }) {
                 className={`h-10 rounded-xl flex items-center justify-center font-medium text-sm transition-all ${
                   isActive
                     ? 'bg-sber-500 text-white'
-                    : 'bg-white border border-gray-300 text-gray-700'
+                    : 'bg-white border border-gray-300 text-gray-700 dark:bg-night-hover dark:border-night-border dark:text-night-sub'
                 }`}
               >
                 {isActive ? '✓' : step.percent + '%'}
               </div>
-              <p className="text-xs text-gray-600 mt-2">{step.name}</p>
+              <p className="text-xs text-gray-600 dark:text-night-mut mt-2">{step.name}</p>
             </div>
           )
         })}
       </div>
 
       {/* Статус */}
-      <p className="text-sm text-gray-600 mt-6 text-center">
+      <p className="text-sm text-gray-600 dark:text-night-sub mt-6 text-center">
         {progress.status === 'running' && 'Обрабатываю данные — это займёт меньше минуты…'}
         {progress.status === 'queued' && 'В очереди на обработку…'}
         {progress.status === 'done' && 'Готово!'}

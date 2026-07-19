@@ -9,9 +9,7 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from 'recharts'
-
-// Палитра проверена валидатором (CVD-safe), порядок фиксированный.
-const PALETTE = ['#21A038', '#2563EB', '#D97706', '#8B5CF6', '#DB2777', '#06B6D4']
+import { useChartTheme, TOOLTIP_CLASS } from '../theme'
 
 const MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 
@@ -30,10 +28,10 @@ function ChartTooltip({ active, payload, label }) {
   // Сортируем по значению, чтобы порядок в тултипе совпадал с порядком линий на экране
   const sorted = [...payload].sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-md px-4 py-3 text-sm">
-      <p className="font-semibold text-gray-900 mb-1">{formatDateFull(label)}</p>
+    <div className={TOOLTIP_CLASS}>
+      <p className="font-semibold text-gray-900 dark:text-night-text mb-1">{formatDateFull(label)}</p>
       {sorted.map((item) => (
-        <p key={item.dataKey} className="text-gray-700 num flex items-center gap-2">
+        <p key={item.dataKey} className="text-gray-700 dark:text-night-sub num flex items-center gap-2">
           <span
             className="inline-block w-2.5 h-2.5 rounded-full"
             style={{ background: item.color }}
@@ -81,6 +79,7 @@ function buildRebasedData(assets, benchmark) {
 }
 
 export function ComparisonChart({ assets, benchmark }) {
+  const t = useChartTheme()
   const { data, tickers, benchName } = buildRebasedData(assets || {}, benchmark)
   if (tickers.length < 2) return null
 
@@ -94,29 +93,31 @@ export function ComparisonChart({ assets, benchmark }) {
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
-            <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" vertical={false} />
+            <CartesianGrid stroke={t.grid} strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="date"
               tickFormatter={formatDate}
-              tick={{ fontSize: 12, fill: '#6B7280' }}
+              tick={{ fontSize: 12, fill: t.tick }}
               tickLine={false}
-              axisLine={{ stroke: '#E5E7EB' }}
+              axisLine={{ stroke: t.axisLine }}
               minTickGap={48}
             />
             <YAxis
               domain={['auto', 'auto']}
-              tick={{ fontSize: 12, fill: '#6B7280' }}
+              tick={{ fontSize: 12, fill: t.tick }}
               tickLine={false}
               axisLine={false}
               width={48}
             />
-            <ReferenceLine y={100} stroke="#9CA3AF" strokeDasharray="4 4" />
+            <ReferenceLine y={100} stroke={t.refLine} strokeDasharray="4 4" />
             <Tooltip
               content={<ChartTooltip />}
-              cursor={{ stroke: '#9CA3AF', strokeDasharray: '4 4' }}
+              cursor={{ stroke: t.cursor, strokeDasharray: '4 4' }}
             />
             <Legend
-              formatter={(value) => <span className="text-sm text-gray-700">{value}</span>}
+              formatter={(value) => (
+                <span className="text-sm text-gray-700 dark:text-night-sub">{value}</span>
+              )}
               iconType="plainline"
             />
             {tickers.map((ticker, i) => (
@@ -125,7 +126,7 @@ export function ComparisonChart({ assets, benchmark }) {
                 type="monotone"
                 dataKey={ticker}
                 name={ticker}
-                stroke={PALETTE[i % PALETTE.length]}
+                stroke={t.palette[i % t.palette.length]}
                 strokeWidth={2}
                 dot={false}
                 connectNulls
@@ -137,7 +138,7 @@ export function ComparisonChart({ assets, benchmark }) {
                 type="monotone"
                 dataKey={benchName}
                 name={`${benchName} (бенчмарк)`}
-                stroke="#64748B"
+                stroke={t.refLine}
                 strokeWidth={1.5}
                 strokeDasharray="6 4"
                 dot={false}

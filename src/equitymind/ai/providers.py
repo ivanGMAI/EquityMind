@@ -164,12 +164,17 @@ class OpenRouterProvider(LLMProvider):
         self,
         model: str | None = None,
         *,
-        max_tokens: int = 2000,
+        max_tokens: int = 900,
         api_key: str | None = None,
+        timeout: float = 90.0,
     ) -> None:
         self.model = openrouter.resolve_model(model)
-        self.max_tokens = max(max_tokens, 2000)
+        # Keep the output budget modest: reasoning models spend tokens on hidden
+        # reasoning, so a large budget balloons latency past the timeout. A few
+        # hundred tokens is plenty for the short structured commentary.
+        self.max_tokens = max(max_tokens, 256)
         self._api_key = api_key
+        self._timeout = timeout
 
     def generate_commentary(
         self,
@@ -179,33 +184,30 @@ class OpenRouterProvider(LLMProvider):
         user: str,
         schema: dict[str, Any],
     ) -> dict[str, Any]:
+        # Schema is inlined into the prompt rather than sent as `response_format`:
+        # reasoning models (e.g. GLM) return an EMPTY message when a strict
+        # json_schema is combined with their hidden reasoning, so we ask for JSON
+        # in words and extract it leniently. Reasoning is capped so a visible
+        # answer is actually emitted instead of being all "thinking".
         body: dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.max_tokens,
+            "reasoning": {"max_tokens": 64},
             "messages": [
                 {"role": "system", "content": system},
-                {"role": "user", "content": user},
+                {
+                    "role": "user",
+                    "content": (
+                        f"{user}\n\nReturn ONLY a JSON object matching this schema, "
+                        f"with no surrounding prose:\n{json.dumps(schema)}"
+                    ),
+                },
             ],
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {"name": "commentary", "strict": True, "schema": schema},
-            },
         }
         try:
-            data = openrouter.chat_completion(body, api_key=self._api_key)
+            data = openrouter.chat_completion(body, api_key=self._api_key, timeout=self._timeout)
         except openrouter.OpenRouterError as exc:
-            if "400" not in str(exc):
-                raise ProviderError(f"OpenRouter request failed: {exc}") from exc
-            # The chosen model likely rejects response_format — inline the schema.
-            body.pop("response_format")
-            body["messages"][1]["content"] = (
-                f"{user}\n\nReturn ONLY a JSON object matching this schema, "
-                f"with no surrounding prose:\n{json.dumps(schema)}"
-            )
-            try:
-                data = openrouter.chat_completion(body, api_key=self._api_key)
-            except openrouter.OpenRouterError as exc2:
-                raise ProviderError(f"OpenRouter request failed: {exc2}") from exc2
+            raise ProviderError(f"OpenRouter request failed: {exc}") from exc
 
         text = openrouter.message_text(openrouter.first_message(data))
         if not text.strip():

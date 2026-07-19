@@ -90,7 +90,7 @@ ai:
   # Provider is resolved at runtime: env override -> credentials present ->
   # mock fallback. See equitymind.ai.providers.build_provider.
   model: "claude-opus-4-8"
-  max_tokens: 1500
+  max_tokens: 800   # output budget (reasoning is capped separately in the provider)
   effort: "medium"          # low | medium | high | max (adaptive-thinking depth)
   temperature_note: "sampling params are not sent; Opus 4.8 rejects them"
 

@@ -8,7 +8,9 @@ import {
   Tooltip,
   Legend,
   CartesianGrid,
+  Brush,
 } from 'recharts'
+import { useChartTheme, TOOLTIP_CLASS } from '../theme'
 
 // Дата "2026-07-17" -> "17 июл"
 const MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
@@ -18,24 +20,24 @@ function formatDate(iso) {
   return `${parseInt(d, 10)} ${MONTHS[parseInt(m, 10) - 1]}`
 }
 
+// Ось X: месяц + короткий год, напр. "июл ’24"
+function formatAxis(iso) {
+  const [y, m] = iso.split('-')
+  return `${MONTHS[parseInt(m, 10) - 1]} ’${y.slice(2)}`
+}
+
 function formatDateFull(iso) {
   const [y, m, d] = iso.split('-')
   return `${parseInt(d, 10)} ${MONTHS[parseInt(m, 10) - 1]} ${y}`
 }
 
-const SERIES = [
-  { key: 'close', name: 'Цена закрытия', color: '#21A038' },
-  { key: 'sma20', name: 'SMA 20', color: '#D97706' },
-  { key: 'sma50', name: 'SMA 50', color: '#8B5CF6' },
-]
-
 function ChartTooltip({ active, payload, label, currency }) {
   if (!active || !payload || !payload.length) return null
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-md px-4 py-3 text-sm">
-      <p className="font-semibold text-gray-900 mb-1">{formatDateFull(label)}</p>
+    <div className={TOOLTIP_CLASS}>
+      <p className="font-semibold text-gray-900 dark:text-night-text mb-1">{formatDateFull(label)}</p>
       {payload.map((item) => (
-        <p key={item.dataKey} className="text-gray-700 num flex items-center gap-2">
+        <p key={item.dataKey} className="text-gray-700 dark:text-night-sub num flex items-center gap-2">
           <span
             className="inline-block w-2.5 h-2.5 rounded-full"
             style={{ background: item.color }}
@@ -52,6 +54,7 @@ function ChartTooltip({ active, payload, label, currency }) {
 }
 
 export function PriceChart({ history, ticker, currency }) {
+  const t = useChartTheme()
   if (!history || history.length < 2) return null
 
   return (
@@ -69,18 +72,18 @@ export function PriceChart({ history, ticker, currency }) {
                 <stop offset="100%" stopColor="#21A038" stopOpacity={0.02} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" vertical={false} />
+            <CartesianGrid stroke={t.grid} strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="date"
-              tickFormatter={formatDate}
-              tick={{ fontSize: 12, fill: '#6B7280' }}
+              tickFormatter={formatAxis}
+              tick={{ fontSize: 12, fill: t.tick }}
               tickLine={false}
-              axisLine={{ stroke: '#E5E7EB' }}
+              axisLine={{ stroke: t.axisLine }}
               minTickGap={48}
             />
             <YAxis
               domain={['auto', 'auto']}
-              tick={{ fontSize: 12, fill: '#6B7280' }}
+              tick={{ fontSize: 12, fill: t.tick }}
               tickLine={false}
               axisLine={false}
               width={64}
@@ -88,10 +91,12 @@ export function PriceChart({ history, ticker, currency }) {
             />
             <Tooltip
               content={<ChartTooltip currency={currency} />}
-              cursor={{ stroke: '#9CA3AF', strokeDasharray: '4 4' }}
+              cursor={{ stroke: t.cursor, strokeDasharray: '4 4' }}
             />
             <Legend
-              formatter={(value) => <span className="text-sm text-gray-700">{value}</span>}
+              formatter={(value) => (
+                <span className="text-sm text-gray-700 dark:text-night-sub">{value}</span>
+              )}
               iconType="plainline"
             />
             <Area
@@ -122,11 +127,21 @@ export function PriceChart({ history, ticker, currency }) {
               dot={false}
               connectNulls
             />
+            {/* Ползунок масштаба: тяни края, чтобы приблизить участок графика */}
+            <Brush
+              dataKey="date"
+              height={22}
+              travellerWidth={8}
+              stroke="#21A038"
+              fill="transparent"
+              tickFormatter={formatAxis}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-xs text-gray-400 mt-2">
+      <p className="text-xs text-gray-400 dark:text-night-mut mt-2">
         SMA — среднее за 20/50 дней: сглаживает шум и показывает направление тренда.
+        Тяни ползунок под графиком, чтобы приблизить участок.
       </p>
     </div>
   )

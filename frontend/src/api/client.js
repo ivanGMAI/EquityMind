@@ -17,6 +17,10 @@ export const analyzeApi = {
 
   getTickers: (source) => client.get('/api/tickers', { params: { source } }),
 
+  // Ценовой ряд одного инструмента для графика (без полного анализа).
+  getPrices: (ticker, source, period) =>
+    client.get('/api/prices', { params: { ticker, source, period }, timeout: 60000 }),
+
   submit: (params) =>
     client.post('/api/analyze', {
       tickers: params.tickers,

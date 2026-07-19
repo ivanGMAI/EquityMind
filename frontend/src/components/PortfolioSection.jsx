@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   LabelList,
 } from 'recharts'
+import { useChartTheme, TOOLTIP_CLASS } from '../theme'
 
 // Цвета аллокаций — фиксированный порядок из проверенной палитры.
 const ALLOC_META = {
@@ -29,20 +30,34 @@ function FrontierTooltip({ active, payload }) {
   if (!active || !payload || !payload.length) return null
   const p = payload[0].payload
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-md px-4 py-3 text-sm">
-      <p className="font-semibold text-gray-900 mb-1">{p.name || 'Граница'}</p>
-      <p className="text-gray-700 num">Волатильность: {p.volatility_pct?.toFixed(1)}%</p>
-      <p className="text-gray-700 num">Доходность: {p.return_pct?.toFixed(1)}%</p>
-      {p.sharpe != null && <p className="text-gray-700 num">Шарп: {p.sharpe.toFixed(2)}</p>}
+    <div className={TOOLTIP_CLASS}>
+      <p className="font-semibold text-gray-900 dark:text-night-text mb-1">{p.name || 'Граница'}</p>
+      <p className="text-gray-700 dark:text-night-sub num">Волатильность: {p.volatility_pct?.toFixed(1)}%</p>
+      <p className="text-gray-700 dark:text-night-sub num">Доходность: {p.return_pct?.toFixed(1)}%</p>
+      {p.sharpe != null && <p className="text-gray-700 dark:text-night-sub num">Шарп: {p.sharpe.toFixed(2)}</p>}
     </div>
   )
 }
 
 export function PortfolioSection({ portfolio, assets }) {
+  const t = useChartTheme()
   if (!portfolio || !portfolio.allocations) return null
 
   const tickers = portfolio.tickers || []
-  const frontier = portfolio.frontier || []
+
+  // Бэкенд отдаёт обе ветви гиперболы; рисуем только эффективную (верхнюю):
+  // от вершины (минимальная волатильность) вверх, отсортированную по риску —
+  // иначе линия зигзагом скачет между ветвями.
+  const rawFrontier = portfolio.frontier || []
+  let frontier = []
+  if (rawFrontier.length) {
+    const vertex = rawFrontier.reduce((a, b) =>
+      b.volatility_pct < a.volatility_pct ? b : a
+    )
+    frontier = rawFrontier
+      .filter((p) => p.return_pct >= vertex.return_pct)
+      .sort((a, b) => a.volatility_pct - b.volatility_pct)
+  }
 
   // Точки отдельных бумаг: годовая доходность × волатильность из метрик.
   const assetPoints = Object.entries(assets || {})
@@ -71,7 +86,7 @@ export function PortfolioSection({ portfolio, assets }) {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold mb-1">Портфельная аналитика</h2>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-night-mut">
           {tickers.length} бумаг · {portfolio.observations} пересекающихся наблюдений ·
           средняя парная корреляция {portfolio.average_correlation > 0 ? '+' : ''}
           {portfolio.average_correlation?.toFixed(2)} · безрисковая ставка{' '}
@@ -90,20 +105,21 @@ export function PortfolioSection({ portfolio, assets }) {
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart margin={{ top: 16, right: 24, bottom: 8, left: 8 }}>
-                <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" />
+                <CartesianGrid stroke={t.grid} strokeDasharray="3 3" />
                 <XAxis
                   type="number"
                   dataKey="volatility_pct"
                   name="Волатильность"
                   domain={['auto', 'auto']}
-                  tick={{ fontSize: 12, fill: '#6B7280' }}
+                  tick={{ fontSize: 12, fill: t.tick }}
                   tickLine={false}
+                  axisLine={{ stroke: t.axisLine }}
                   label={{
                     value: 'Годовая волатильность, %',
                     position: 'insideBottom',
                     offset: -4,
                     fontSize: 12,
-                    fill: '#6B7280',
+                    fill: t.tick,
                   }}
                 />
                 <YAxis
@@ -111,7 +127,7 @@ export function PortfolioSection({ portfolio, assets }) {
                   dataKey="return_pct"
                   name="Доходность"
                   domain={['auto', 'auto']}
-                  tick={{ fontSize: 12, fill: '#6B7280' }}
+                  tick={{ fontSize: 12, fill: t.tick }}
                   tickLine={false}
                   axisLine={false}
                   width={56}
@@ -120,24 +136,24 @@ export function PortfolioSection({ portfolio, assets }) {
                     angle: -90,
                     position: 'insideLeft',
                     fontSize: 12,
-                    fill: '#6B7280',
+                    fill: t.tick,
                   }}
                 />
                 <Tooltip content={<FrontierTooltip />} />
                 <Legend
                   formatter={(value) => (
-                    <span className="text-sm text-gray-700">{value}</span>
+                    <span className="text-sm text-gray-700 dark:text-night-sub">{value}</span>
                   )}
                 />
                 <Scatter
                   name="Эффективная граница"
                   data={frontier}
-                  fill="#94A3B8"
-                  line={{ stroke: '#94A3B8', strokeWidth: 2 }}
+                  fill={t.refLine}
+                  line={{ stroke: t.refLine, strokeWidth: 2 }}
                   shape={() => null}
                 />
-                <Scatter name="Бумаги" data={assetPoints} fill="#334155">
-                  <LabelList dataKey="name" position="top" style={{ fontSize: 11, fill: '#334155' }} />
+                <Scatter name="Бумаги" data={assetPoints} fill={t.ink}>
+                  <LabelList dataKey="name" position="top" style={{ fontSize: 11, fill: t.ink }} />
                 </Scatter>
                 {allocPoints.map((p) => (
                   <Scatter key={p.key} name={p.name} data={[p]} fill={p.color} />
@@ -160,9 +176,9 @@ export function PortfolioSection({ portfolio, assets }) {
               <thead>
                 <tr>
                   <th className="p-2" />
-                  {tickers.map((t) => (
-                    <th key={t} className="p-2 font-semibold text-gray-700 text-center">
-                      {t}
+                  {tickers.map((tk) => (
+                    <th key={tk} className="p-2 font-semibold text-gray-700 dark:text-night-sub text-center">
+                      {tk}
                     </th>
                   ))}
                 </tr>
@@ -170,7 +186,7 @@ export function PortfolioSection({ portfolio, assets }) {
               <tbody>
                 {tickers.map((row) => (
                   <tr key={row}>
-                    <th className="p-2 font-semibold text-gray-700 text-left">{row}</th>
+                    <th className="p-2 font-semibold text-gray-700 dark:text-night-sub text-left">{row}</th>
                     {tickers.map((col) => {
                       const v = portfolio.correlation?.[row]?.[col]
                       return (
@@ -198,7 +214,7 @@ export function PortfolioSection({ portfolio, assets }) {
           </p>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-gray-700">
+              <tr className="border-b border-gray-200 dark:border-night-border text-gray-700 dark:text-night-sub">
                 <th className="py-2 text-left font-semibold">Аллокация</th>
                 <th className="py-2 text-right font-semibold">Доходн., %</th>
                 <th className="py-2 text-right font-semibold">Волат., %</th>
@@ -207,18 +223,18 @@ export function PortfolioSection({ portfolio, assets }) {
             </thead>
             <tbody>
               {Object.entries(portfolio.allocations).map(([key, a]) => (
-                <tr key={key} className="border-b border-gray-100 align-top">
+                <tr key={key} className="border-b border-gray-100 dark:border-night-border align-top">
                   <td className="py-2 pr-2">
-                    <span className="flex items-center gap-2 font-medium text-gray-900">
+                    <span className="flex items-center gap-2 font-medium text-gray-900 dark:text-night-text">
                       <span
                         className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
                         style={{ background: ALLOC_META[key]?.color || '#2563EB' }}
                       />
                       {ALLOC_META[key]?.label || a.label}
                     </span>
-                    <span className="block text-xs text-gray-500 mt-1 num">
+                    <span className="block text-xs text-gray-500 dark:text-night-mut mt-1 num">
                       {Object.entries(a.weights || {})
-                        .map(([t, w]) => `${t} ${w > 0 ? '' : ''}${w}%`)
+                        .map(([tk, w]) => `${tk} ${w}%`)
                         .join(' · ')}
                     </span>
                   </td>
@@ -229,7 +245,7 @@ export function PortfolioSection({ portfolio, assets }) {
               ))}
             </tbody>
           </table>
-          <p className="text-xs text-gray-400 mt-3">
+          <p className="text-xs text-gray-400 dark:text-night-mut mt-3">
             Мин. дисперсия и макс. Шарп — без ограничений (возможны отрицательные
             веса, т.е. короткие позиции). Ожидаемые доходности — исторические
             средние, не прогноз.

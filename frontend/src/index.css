@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-[#F4F7F4] text-gray-900;
+    @apply bg-[#F4F7F4] text-gray-900 dark:bg-night-bg dark:text-night-text;
   }
 
   h1 {
@@ -22,15 +22,16 @@
 
 @layer components {
   .card {
-    @apply bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow;
+    @apply bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow
+      dark:bg-night-card dark:border-night-border dark:shadow-none;
   }
 
   .card-title {
-    @apply text-lg font-semibold text-gray-900 mb-2;
+    @apply text-lg font-semibold text-gray-900 mb-2 dark:text-night-text;
   }
 
   .card-text {
-    @apply text-gray-600 text-sm;
+    @apply text-gray-600 text-sm dark:text-night-sub;
   }
 
   .btn {
@@ -42,15 +43,17 @@
   }
 
   .btn-secondary {
-    @apply bg-gray-200 text-gray-900 hover:bg-gray-300;
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300
+      dark:bg-night-hover dark:text-night-text dark:hover:bg-night-border;
   }
 
   .metric-card {
-    @apply bg-white rounded-xl border border-l-4 border-l-sber-500 border-gray-200 p-6 shadow-sm;
+    @apply bg-white rounded-xl border border-l-4 border-l-sber-500 border-gray-200 p-6 shadow-sm
+      dark:bg-night-card dark:border-night-border dark:border-l-sber-500 dark:shadow-none;
   }
 
   .progress-bar {
-    @apply w-full bg-gray-200 rounded-full h-2 overflow-hidden;
+    @apply w-full bg-gray-200 rounded-full h-2 overflow-hidden dark:bg-night-border;
   }
 
   /* Фирменный градиент Сбера: зелёный → бирюза */
@@ -62,4 +65,61 @@
   .num {
     font-variant-numeric: tabular-nums;
   }
+
+  /* Общие утилиты тёмной темы для полей ввода */
+  .input-base {
+    @apply border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sber-500
+      bg-white text-gray-900 placeholder-gray-400
+      dark:bg-night-hover dark:border-night-border dark:text-night-text dark:placeholder-night-mut;
+  }
+}
+
+/* --- Анимации ------------------------------------------------------------- */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.28s ease-out;
+}
+
+@keyframes fadeSwap {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  15%,
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* Shimmer-скелетон: имитация «печатающегося» текста нейросети */
+@keyframes shimmer {
+  0% {
+    background-position: -450px 0;
+  }
+  100% {
+    background-position: 450px 0;
+  }
+}
+
+.shimmer-line {
+  height: 0.7rem;
+  border-radius: 0.4rem;
+  background: linear-gradient(90deg, #dcefe1 25%, #f1f8f3 50%, #dcefe1 75%);
+  background-size: 900px 100%;
+  animation: shimmer 1.5s infinite linear;
 }

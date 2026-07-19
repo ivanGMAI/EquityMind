@@ -168,19 +168,30 @@ class MoexSource(DataSource):
 
         pages: list[pd.DataFrame] = []
         start = 0
-        for _ in range(200):  # hard stop against a runaway cursor
+        for _ in range(400):  # safety cap (400 * 500 ≈ 200k daily bars)
             url = f"{base}?{urllib.parse.urlencode({**params, 'start': start})}"
-            try:
-                payload = _http_get_json(url)
-            except Exception as exc:  # network / vendor errors
-                raise DataSourceError(f"{ticker}: MOEX fetch failed ({exc})") from exc
+            payload = None
+            for attempt in range(3):  # a flaky page shouldn't kill a long paginated pull
+                try:
+                    payload = _http_get_json(url)
+                    break
+                except Exception as exc:  # network / vendor errors
+                    if attempt == 2:
+                        raise DataSourceError(f"{ticker}: MOEX fetch failed ({exc})") from exc
+            assert payload is not None
+            raw_rows = payload.get("candles", {}).get("data", [])
+            if not raw_rows:
+                break
             page = _parse_candles(payload)
             if not page.empty:
                 pages.append(page)
-            index, total, pagesize = _cursor_needs_more(payload)
-            if pagesize == 0 or index + pagesize >= total or page.empty:
+            # The candles cursor's TOTAL is per-response, not the grand total, so
+            # relying on it stops after the first page. Instead paginate by the
+            # actual row count: a page shorter than the page size is the last one.
+            _, _, pagesize = _cursor_needs_more(payload)
+            if len(raw_rows) < (pagesize or 500):
                 break
-            start = index + pagesize
+            start += len(raw_rows)
 
         if not pages:
             raise DataSourceError(f"{ticker}: no data returned from MOEX (unknown symbol?)")

@@ -50,7 +50,7 @@ export function MetricsCards({ assets }) {
         </div>
         <p
           className={`text-sm font-medium ${
-            avgReturn >= 0 ? 'text-sber-600' : 'text-red-600'
+            avgReturn >= 0 ? 'text-sber-600 dark:text-sber-400' : 'text-red-600 dark:text-red-400'
           }`}
         >
           накопленная, в среднем по {tickers.length} актив(ам)
@@ -68,7 +68,7 @@ export function MetricsCards({ assets }) {
           </div>
           <BarChart3 className="w-12 h-12 text-sber-500 opacity-50" />
         </div>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600 dark:text-night-sub">
           {avgVolatility > 30
             ? 'Высокая — цены сильно колеблются'
             : avgVolatility > 15
@@ -86,28 +86,28 @@ export function MetricsCards({ assets }) {
               {avgSharpe.toFixed(2)}
             </p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-sber-100 flex items-center justify-center text-sber-600 font-bold opacity-70">
+          <div className="w-12 h-12 rounded-xl bg-sber-100 dark:bg-sber-900 flex items-center justify-center text-sber-600 dark:text-sber-300 font-bold opacity-70">
             λ
           </div>
         </div>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600 dark:text-night-sub">
           Доходность на единицу риска:{' '}
           {avgSharpe > 1 ? 'хорошо' : avgSharpe > 0 ? 'положительно' : 'отрицательно'}
         </p>
       </div>
 
       {/* Максимальная просадка */}
-      <div className="metric-card border-l-warning">
+      <div className="metric-card border-l-warning dark:border-l-warning">
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="card-text">Макс. просадка</p>
-            <p className="text-3xl font-bold mt-2 text-red-600 num">
+            <p className="text-3xl font-bold mt-2 text-red-600 dark:text-red-400 num">
               {maxDrawdown.toFixed(2)}%
             </p>
           </div>
           <AlertCircle className="w-12 h-12 text-amber-500 opacity-50" />
         </div>
-        <p className="text-sm text-gray-600">Худшее падение от пика до дна</p>
+        <p className="text-sm text-gray-600 dark:text-night-sub">Худшее падение от пика до дна</p>
       </div>
     </div>
   )

@@ -11,7 +11,6 @@ Or use the convenience function:
 from __future__ import annotations
 
 import asyncio
-import os
 import time
 import uuid
 from datetime import datetime, timezone
@@ -118,6 +117,36 @@ def create_app() -> FastAPI:
         entries.sort(key=lambda e: e["ticker"])
         _catalog_cache[source] = (now, entries)
         return {"source": source, "tickers": entries}
+
+    @app.get("/api/prices", tags=["analysis"], response_model=None)
+    async def get_prices(
+        ticker: str = Query(..., description="Instrument symbol, e.g. IMOEX"),
+        source: str = Query("moex", description="Data source: moex, yfinance, csv"),
+        period: str = Query("1y", description="History window: 1mo…max"),
+        interval: str = Query("1d"),
+    ) -> Any:
+        """Chart-ready price history for a single instrument (no full analysis).
+
+        Powers the home-screen index chart with its own timeframe selector.
+        """
+        settings = get_settings()
+        settings.data.source = source
+        settings.data.period = period
+        settings.data.interval = interval
+        loader = IntelligencePipeline._build_loader(settings)
+        try:
+            history = await asyncio.to_thread(
+                loader.load, ticker, period=period, interval=interval
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502, detail=f"Не удалось загрузить {ticker}: {exc}"
+            ) from exc
+        return {
+            "ticker": history.ticker,
+            "currency": history.currency,
+            "history": _serialize_history(history, max_points=1000),
+        }
 
     @app.post("/api/analyze", tags=["analysis"], response_model=JobSubmitResponse)
     async def submit_analysis(request: AnalysisRequest) -> JobSubmitResponse:
@@ -375,17 +404,29 @@ async def _run_analysis(job_id: str) -> None:
 
         # Run analysis (synchronous, blocking)
         job.progress = 0.1
-        job.current_step = "Загружаю исторические данные…"
-
-        # pipeline.run() is synchronous; run it in a worker thread so the
-        # event loop keeps serving /api/progress polls during the analysis.
-        report = await asyncio.to_thread(
-            pipeline.run,
-            tickers=req.tickers or None,
-            with_commentary=req.with_ai,
-            with_backtest=req.with_backtest,
-            return_basis=req.return_basis,
+        job.current_step = (
+            "Считаю метрики и AI-комментарий…" if req.with_ai else "Считаю метрики…"
         )
+
+        # pipeline.run() is synchronous; run it in a worker thread so the event
+        # loop keeps serving /api/progress polls. The pipeline doesn't emit
+        # sub-step progress (the AI commentary dominates and gives no signal), so
+        # we creep the bar forward while we wait — it never reaches 0.9 until the
+        # real work is actually done.
+        task = asyncio.create_task(
+            asyncio.to_thread(
+                pipeline.run,
+                tickers=req.tickers or None,
+                with_commentary=req.with_ai,
+                with_backtest=req.with_backtest,
+                return_basis=req.return_basis,
+            )
+        )
+        while not task.done():
+            await asyncio.sleep(1.2)
+            if job.progress < 0.85:
+                job.progress = round(min(0.85, job.progress + 0.025), 3)
+        report = await task
 
         job.progress = 0.9
         job.current_step = "Обрабатываю результаты…"
@@ -409,8 +450,9 @@ async def _run_analysis(job_id: str) -> None:
 def _serialize_history(history: Any, max_points: int = 1500) -> list[dict[str, Any]]:
     """Serialize a PriceHistory to chart-ready points with SMA overlays.
 
-    Caps the series at ``max_points`` (most recent bars) so multi-year daily
-    histories don't bloat the JSON payload.
+    Long histories are *evenly down-sampled* (not truncated) to ``max_points`` so
+    an "all time" view spans the whole range while staying light enough for the
+    browser to render smoothly (thousands of points freeze the chart).
     """
     import math
 
@@ -420,7 +462,11 @@ def _serialize_history(history: Any, max_points: int = 1500) -> list[dict[str, A
     sma20_full = sma(close_full, 20)
     sma50_full = sma(close_full, 50)
 
-    close = close_full.iloc[-max_points:]
+    if len(close_full) > max_points:
+        step = len(close_full) // max_points + 1
+        close = close_full.iloc[::step]
+    else:
+        close = close_full
     sma20 = sma20_full.reindex(close.index)
     sma50 = sma50_full.reindex(close.index)
 

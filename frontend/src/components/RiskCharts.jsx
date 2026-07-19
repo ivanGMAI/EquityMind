@@ -14,12 +14,19 @@ import {
   ReferenceLine,
   Cell,
 } from 'recharts'
+import { useChartTheme, TOOLTIP_CLASS } from '../theme'
 
 const MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 
 function fmtDate(iso) {
-  const [, m, d] = iso.split('-')
-  return `${parseInt(d, 10)} ${MONTHS[parseInt(m, 10) - 1]}`
+  const [y, m, d] = iso.split('-')
+  return `${parseInt(d, 10)} ${MONTHS[parseInt(m, 10) - 1]} ${y}`
+}
+
+// Ось X: месяц + короткий год, напр. "июл ’24"
+function fmtAxis(iso) {
+  const [y, m] = iso.split('-')
+  return `${MONTHS[parseInt(m, 10) - 1]} ’${y.slice(2)}`
 }
 
 /** Дневные доходности в процентах из ценового ряда. */
@@ -43,10 +50,10 @@ function std(values) {
 function SimpleTooltip({ active, payload, label, suffix = '%', digits = 2 }) {
   if (!active || !payload || !payload.length) return null
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-md px-3 py-2 text-sm num">
-      {label && <p className="font-semibold text-gray-900">{fmtDate(label)}</p>}
+    <div className={TOOLTIP_CLASS + ' num'}>
+      {label && <p className="font-semibold text-gray-900 dark:text-night-text">{fmtDate(label)}</p>}
       {payload.map((p) => (
-        <p key={p.dataKey} className="text-gray-700">
+        <p key={p.dataKey} className="text-gray-700 dark:text-night-sub">
           {p.name}: <strong>{p.value?.toFixed(digits)}{suffix}</strong>
         </p>
       ))}
@@ -56,6 +63,7 @@ function SimpleTooltip({ active, payload, label, suffix = '%', digits = 2 }) {
 
 // ---------------------------------------------------------------- underwater
 function DrawdownChart({ history }) {
+  const t = useChartTheme()
   const data = useMemo(() => {
     let peak = -Infinity
     return history.map((p) => {
@@ -71,28 +79,29 @@ function DrawdownChart({ history }) {
       <h3 className="card-title">Просадки (underwater)</h3>
       <p className="card-text mb-3">
         Насколько цена ниже своего исторического максимума. Худшая точка:{' '}
-        <strong className="text-red-600 num">{worst.toFixed(1)}%</strong>
+        <strong className="text-red-600 dark:text-red-400 num">{worst.toFixed(1)}%</strong>
       </p>
       <div className="h-52">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
-            <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" vertical={false} />
+            <CartesianGrid stroke={t.grid} strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="date"
-              tickFormatter={fmtDate}
-              tick={{ fontSize: 11, fill: '#6B7280' }}
+              tickFormatter={fmtAxis}
+              tick={{ fontSize: 11, fill: t.tick }}
               tickLine={false}
+              axisLine={{ stroke: t.axisLine }}
               minTickGap={56}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#6B7280' }}
+              tick={{ fontSize: 11, fill: t.tick }}
               tickLine={false}
               axisLine={false}
               width={44}
               tickFormatter={(v) => `${v.toFixed(0)}%`}
             />
-            <Tooltip content={<SimpleTooltip />} cursor={{ stroke: '#9CA3AF', strokeDasharray: '4 4' }} />
-            <ReferenceLine y={0} stroke="#6B7280" />
+            <Tooltip content={<SimpleTooltip />} cursor={{ stroke: t.cursor, strokeDasharray: '4 4' }} />
+            <ReferenceLine y={0} stroke={t.refLine} />
             <Area
               type="monotone"
               dataKey="dd"
@@ -112,6 +121,7 @@ function DrawdownChart({ history }) {
 
 // ---------------------------------------------------------------- histogram
 function ReturnsHistogram({ history, varPct, confidence }) {
+  const t = useChartTheme()
   const { bins, skewLabel } = useMemo(() => {
     const rets = dailyReturns(history).map((r) => r.ret)
     if (rets.length < 10) return { bins: [], skewLabel: null }
@@ -156,17 +166,18 @@ function ReturnsHistogram({ history, varPct, confidence }) {
       <div className="h-52">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={bins} margin={{ top: 4, right: 8, bottom: 0, left: 4 }} barCategoryGap={1}>
-            <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" vertical={false} />
+            <CartesianGrid stroke={t.grid} strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="mid"
               type="number"
               domain={['dataMin', 'dataMax']}
-              tick={{ fontSize: 11, fill: '#6B7280' }}
+              tick={{ fontSize: 11, fill: t.tick }}
               tickLine={false}
+              axisLine={{ stroke: t.axisLine }}
               tickFormatter={(v) => `${v.toFixed(1)}%`}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#6B7280' }}
+              tick={{ fontSize: 11, fill: t.tick }}
               tickLine={false}
               axisLine={false}
               width={32}
@@ -175,7 +186,7 @@ function ReturnsHistogram({ history, varPct, confidence }) {
             <Tooltip
               formatter={(value) => [value, 'дней']}
               labelFormatter={(v) => `около ${Number(v).toFixed(2)}%`}
-              cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+              cursor={{ fill: 'rgba(127,127,127,0.08)' }}
             />
             {varValue != null && (
               <ReferenceLine
@@ -188,7 +199,7 @@ function ReturnsHistogram({ history, varPct, confidence }) {
             )}
             <Bar dataKey="count" name="Дней" radius={[3, 3, 0, 0]}>
               {bins.map((b, i) => (
-                <Cell key={i} fill={b.mid < 0 ? '#E64646' : '#21A038'} fillOpacity={0.65} />
+                <Cell key={i} fill={b.mid < 0 ? '#E64646' : '#21A038'} fillOpacity={0.7} />
               ))}
             </Bar>
           </BarChart>
@@ -200,6 +211,7 @@ function ReturnsHistogram({ history, varPct, confidence }) {
 
 // ---------------------------------------------------------------- rolling
 function RollingChart({ history }) {
+  const t = useChartTheme()
   const data = useMemo(() => {
     const rets = dailyReturns(history)
     const out = []
@@ -233,38 +245,40 @@ function RollingChart({ history }) {
       </p>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
         <div className="h-44">
-          <p className="text-xs font-semibold text-gray-700 mb-1">Волатильность, % годовых</p>
+          <p className="text-xs font-semibold text-gray-700 dark:text-night-sub mb-1">Волатильность, % годовых</p>
           <ResponsiveContainer width="100%" height="90%">
             <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
-              <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke={t.grid} strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="date"
-                tickFormatter={fmtDate}
-                tick={{ fontSize: 10, fill: '#6B7280' }}
+                tickFormatter={fmtAxis}
+                tick={{ fontSize: 10, fill: t.tick }}
                 tickLine={false}
+                axisLine={{ stroke: t.axisLine }}
                 minTickGap={56}
               />
-              <YAxis tick={{ fontSize: 10, fill: '#6B7280' }} tickLine={false} axisLine={false} width={36} />
+              <YAxis tick={{ fontSize: 10, fill: t.tick }} tickLine={false} axisLine={false} width={36} />
               <Tooltip content={<SimpleTooltip suffix="%" digits={1} />} />
               <Line type="monotone" dataKey="vol" name="Вола" stroke="#D97706" strokeWidth={1.8} dot={false} connectNulls />
             </LineChart>
           </ResponsiveContainer>
         </div>
         <div className="h-44">
-          <p className="text-xs font-semibold text-gray-700 mb-1">Скользящий Шарп</p>
+          <p className="text-xs font-semibold text-gray-700 dark:text-night-sub mb-1">Скользящий Шарп</p>
           <ResponsiveContainer width="100%" height="90%">
             <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
-              <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke={t.grid} strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="date"
-                tickFormatter={fmtDate}
-                tick={{ fontSize: 10, fill: '#6B7280' }}
+                tickFormatter={fmtAxis}
+                tick={{ fontSize: 10, fill: t.tick }}
                 tickLine={false}
+                axisLine={{ stroke: t.axisLine }}
                 minTickGap={56}
               />
-              <YAxis tick={{ fontSize: 10, fill: '#6B7280' }} tickLine={false} axisLine={false} width={36} />
+              <YAxis tick={{ fontSize: 10, fill: t.tick }} tickLine={false} axisLine={false} width={36} />
               <Tooltip content={<SimpleTooltip suffix="" digits={2} />} />
-              <ReferenceLine y={0} stroke="#9CA3AF" strokeDasharray="4 4" />
+              <ReferenceLine y={0} stroke={t.refLine} strokeDasharray="4 4" />
               <Line type="monotone" dataKey="sharpe" name="Шарп" stroke="#8B5CF6" strokeWidth={1.8} dot={false} connectNulls />
             </LineChart>
           </ResponsiveContainer>

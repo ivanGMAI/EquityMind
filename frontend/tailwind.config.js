@@ -4,6 +4,7 @@ export default {
     "./index.html",
     "./src/**/*.{js,jsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
@@ -19,6 +20,16 @@ export default {
           700: '#147026',
           800: '#0E561E',
           900: '#093D15',
+        },
+        // Тёмная тема: глубокие зелёные поверхности
+        night: {
+          bg: '#0C1912',
+          card: '#122419',
+          hover: '#16301F',
+          border: '#1F3A2A',
+          text: '#E6F0E9',
+          sub: '#9DB3A6',
+          mut: '#6A8577',
         },
         primary: '#21A038',
         success: '#21A038',

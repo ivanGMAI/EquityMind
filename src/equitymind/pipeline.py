@@ -10,6 +10,7 @@ one place.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -161,12 +162,6 @@ class IntelligencePipeline:
                     slow_window=max(self.settings.analytics.sma_windows),
                     trading_days=self.settings.analytics.trading_days_per_year,
                 )
-            commentary = None
-            if with_commentary:
-                try:
-                    commentary = self.analyst.analyze(metrics)
-                except Exception as exc:  # commentary is non-fatal
-                    logger.error("Commentary failed for %s: %s", ticker, exc)
             fundamentals = None
             if self.fundamentals_source is not None:
                 try:
@@ -176,10 +171,15 @@ class IntelligencePipeline:
             analyses[ticker] = AssetAnalysis(
                 history=history,
                 metrics=metrics,
-                commentary=commentary,
                 backtest=backtest,
                 fundamentals=fundamentals,
             )
+
+        # AI commentary is by far the slowest step (a multi-second LLM call per
+        # instrument). Run it concurrently across instruments so the total wait is
+        # roughly one call rather than N sequential ones.
+        if with_commentary and analyses:
+            self._attach_commentary(analyses)
 
         comparison = (
             compare_assets([a.metrics for a in analyses.values()], return_basis=return_basis)
@@ -216,6 +216,26 @@ class IntelligencePipeline:
         )
 
     # ------------------------------------------------------------------ helpers
+    def _attach_commentary(self, analyses: dict[str, AssetAnalysis]) -> None:
+        """Generate AI commentary for every instrument concurrently.
+
+        Each call is an independent, network-bound LLM request, so running them
+        in a thread pool collapses N sequential waits into roughly one. Failures
+        are non-fatal per instrument (the asset simply gets no commentary).
+        """
+
+        def _one(ticker: str) -> tuple[str, MarketCommentary | None]:
+            try:
+                return ticker, self.analyst.analyze(analyses[ticker].metrics)
+            except Exception as exc:  # commentary is non-fatal
+                logger.error("Commentary failed for %s: %s", ticker, exc)
+                return ticker, None
+
+        max_workers = min(len(analyses), 8)
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            for ticker, commentary in pool.map(_one, list(analyses)):
+                analyses[ticker].commentary = commentary
+
     def _resolve_benchmark(
         self, histories: dict[str, PriceHistory], use_cache: bool
     ) -> tuple[str | None, pd.Series | None]:

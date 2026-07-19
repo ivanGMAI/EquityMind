@@ -11,7 +11,7 @@ function renderInline(text, keyPrefix) {
     }
     if (part.startsWith('`') && part.endsWith('`')) {
       return (
-        <code key={`${keyPrefix}-${i}`} className="bg-gray-100 px-1 rounded text-xs">
+        <code key={`${keyPrefix}-${i}`} className="bg-gray-100 dark:bg-night-border px-1 rounded text-xs">
           {part.slice(1, -1)}
         </code>
       )
@@ -25,7 +25,7 @@ function MarkdownLite({ text }) {
   const blocks = []
   let list = null
 
-  lines.forEach((line, i) => {
+  lines.forEach((line) => {
     const bullet = line.match(/^\s*[-*]\s+(.*)/)
     const numbered = line.match(/^\s*\d+[.)]\s+(.*)/)
     if (bullet || numbered) {
@@ -50,7 +50,7 @@ function MarkdownLite({ text }) {
       {blocks.map((b, i) => {
         if (b.type === 'heading') {
           return (
-            <p key={i} className="font-semibold text-gray-900 mt-3">
+            <p key={i} className="font-semibold text-gray-900 dark:text-night-text mt-3">
               {renderInline(b.text, i)}
             </p>
           )
@@ -76,7 +76,7 @@ const EXAMPLES = [
   'Оцени 3-месячный ATM-колл на лидера рейтинга при воле 25%',
 ]
 
-export function AgentChat({ jobId }) {
+export function AgentChat({ jobId, embedded = false }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [pending, setPending] = useState(false)
@@ -105,8 +105,8 @@ export function AgentChat({ jobId }) {
   }
 
   return (
-    <div className="card">
-      <h3 className="card-title">🤖 Спроси AI-аналитика</h3>
+    <div className={embedded ? '' : 'card'}>
+      {!embedded && <h3 className="card-title">🤖 Спроси AI-аналитика</h3>}
       <p className="card-text mb-4">
         Агент сам вызывает аналитические инструменты (метрики, рейтинг, портфель,
         оценка опционов) и отвечает на основе реальных цифр
@@ -121,7 +121,7 @@ export function AgentChat({ jobId }) {
               type="button"
               onClick={() => ask(ex)}
               disabled={pending}
-              className="text-xs px-3 py-1.5 rounded-full border border-sber-200 text-sber-700 hover:bg-sber-50 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-full border border-sber-200 text-sber-700 hover:bg-sber-50 dark:border-sber-800 dark:text-sber-300 dark:hover:bg-night-hover transition-colors"
             >
               {ex}
             </button>
@@ -136,7 +136,7 @@ export function AgentChat({ jobId }) {
             if (m.role === 'user') {
               return (
                 <div key={i} className="flex justify-end">
-                  <div className="bg-sber-100 text-sber-900 rounded-2xl rounded-br-md px-4 py-2 text-sm max-w-[85%]">
+                  <div className="bg-sber-100 text-sber-900 dark:bg-sber-900 dark:text-sber-100 rounded-2xl rounded-br-md px-4 py-2 text-sm max-w-[85%]">
                     {m.text}
                   </div>
                 </div>
@@ -144,16 +144,16 @@ export function AgentChat({ jobId }) {
             }
             if (m.role === 'error') {
               return (
-                <div key={i} className="bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-2 text-sm">
+                <div key={i} className="bg-red-50 border border-red-200 text-red-800 dark:bg-red-950/40 dark:border-red-900 dark:text-red-300 rounded-xl px-4 py-2 text-sm">
                   {m.text}
                 </div>
               )
             }
             return (
-              <div key={i} className="bg-white border border-gray-200 rounded-2xl rounded-bl-md px-4 py-3 max-w-[95%]">
+              <div key={i} className="bg-white border border-gray-200 dark:bg-night-hover dark:border-night-border rounded-2xl rounded-bl-md px-4 py-3 max-w-[95%]">
                 <MarkdownLite text={m.text} />
                 {m.steps && m.steps.length > 0 && (
-                  <details className="mt-3 text-xs text-gray-500">
+                  <details className="mt-3 text-xs text-gray-500 dark:text-night-mut">
                     <summary className="cursor-pointer flex items-center gap-1.5 select-none">
                       <Wrench size={12} />
                       Вызовы инструментов: {m.steps.length}
@@ -168,13 +168,13 @@ export function AgentChat({ jobId }) {
                   </details>
                 )}
                 {m.model && (
-                  <p className="text-[10px] text-gray-400 mt-2">{m.model}</p>
+                  <p className="text-[10px] text-gray-400 dark:text-night-mut mt-2">{m.model}</p>
                 )}
               </div>
             )
           })}
           {pending && (
-            <div className="flex items-center gap-2 text-sm text-gray-500 px-2">
+            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-night-mut px-2">
               <span className="inline-block w-2 h-2 rounded-full bg-sber-500 animate-pulse" />
               Агент рассуждает и вызывает инструменты…
             </div>
@@ -196,7 +196,7 @@ export function AgentChat({ jobId }) {
           onChange={(e) => setInput(e.target.value)}
           disabled={pending}
           placeholder="Например: у какой бумаги лучший Шарп?"
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sber-500"
+          className="flex-1 px-4 py-2 input-base"
         />
         <button
           type="submit"
