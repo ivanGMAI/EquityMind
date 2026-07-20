@@ -462,11 +462,14 @@ def make_payoff(path):
     ax.text(K + 1.5, ymax - 1.0, f"Страйк {K:.0f}", ha="left", va="top",
             color=M_INK2, fontsize=10, fontweight=600)
     ax.plot(s, pay, color=M_INK, lw=2.6, solid_joinstyle="round")
-    for be in (K - prem, K + prem):
+    # Labels go into the empty side of each breakeven: the payoff line drops
+    # below zero towards the strike, so left-BE labels right-up, right-BE
+    # labels left-up — centred labels sit right on the diagonal line.
+    for be, off, ha in ((K - prem, (12, 8), "left"), (K + prem, (-12, 8), "right")):
         ax.scatter([be], [0], s=80, color=M_GREEN, edgecolors=M_PAPER, lw=2,
                    zorder=5)
-        ax.annotate(f"Безубыток {ru(be)}", (be, 0), (0, 12),
-                    textcoords="offset points", ha="center",
+        ax.annotate(f"Безубыток {ru(be)}", (be, 0), off,
+                    textcoords="offset points", ha=ha,
                     color=M_GREEN_D, fontweight="bold", fontsize=10.5)
     ax.scatter([K], [-prem], s=64, color=M_WARM, edgecolors=M_PAPER, lw=2,
                zorder=5)
