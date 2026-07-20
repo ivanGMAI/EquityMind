@@ -27,6 +27,23 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import font_manager
+
+
+def _register_segoe() -> None:
+    """Draw charts in Segoe UI (the deck's font) when Windows fonts are
+    reachable — e.g. under WSL via /mnt/c. Falls back to DejaVu silently."""
+    found = False
+    for name in ("segoeui.ttf", "segoeuib.ttf", "segoeuii.ttf", "seguisb.ttf"):
+        p = Path("/mnt/c/Windows/Fonts") / name
+        if p.exists():
+            font_manager.fontManager.addfont(str(p))
+            found = True
+    if found:
+        plt.rcParams["font.family"] = "Segoe UI"
+
+
+_register_segoe()
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
@@ -440,8 +457,10 @@ def make_payoff(path):
     ax.fill_between([K + prem, hi], 0, ymax, color=M_GREEN, alpha=0.07)
     ax.axhline(0, color=M_AXIS, lw=1.5)
     ax.axvline(K, color=M_INK3, lw=1.2, ls=(0, (3, 4)))
-    ax.text(K, ymax + 0.8, f"Страйк {K:.0f}", ha="center", color=M_INK2,
-            fontsize=10, fontweight=600)
+    # Inside the axes, beside the strike line — above the axes it collides
+    # with the chart title.
+    ax.text(K + 1.5, ymax - 1.0, f"Страйк {K:.0f}", ha="left", va="top",
+            color=M_INK2, fontsize=10, fontweight=600)
     ax.plot(s, pay, color=M_INK, lw=2.6, solid_joinstyle="round")
     for be in (K - prem, K + prem):
         ax.scatter([be], [0], s=80, color=M_GREEN, edgecolors=M_PAPER, lw=2,
@@ -640,10 +659,9 @@ def s06_var(prs):
              f"VaR 95% (исторический): −{ru(tail['historical_var_pct'])}% в день",
              "warm")
     x = chip(s, x, y,
-             f"CVaR — ожидаемые потери в хвосте: −{ru(tail['historical_cvar_pct'])}%",
+             f"CVaR — потери в хвосте: −{ru(tail['historical_cvar_pct'])}%",
              "warm")
-    chip(s, x, y,
-         f"Параметрический VaR: −{ru(tail['parametric_var_pct'])}% — сверка методов")
+    chip(s, x, y, f"Параметрический VaR: −{ru(tail['parametric_var_pct'])}%")
     foot(s, "06")
 
 
